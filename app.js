@@ -37,8 +37,14 @@ const els = {
   activityList: $("#activityList"),
   adminPhotoGrid: $("#adminPhotoGrid"),
   adminPhotoEmpty: $("#adminPhotoEmpty"),
+  galleryLinkInput: $("#galleryLinkInput"),
+  saveGalleryLinkBtn: $("#saveGalleryLinkBtn"),
+  galleryLinkState: $("#galleryLinkState"),
+  openGalleryLink: $("#openGalleryLink"),
   shareLink: $("#shareLink"),
   regenerateShareLinkBtn: $("#regenerateShareLinkBtn"),
+  copyShareLinkBtn: $("#copyShareLinkBtn"),
+  userSaveLink: $("#userSaveLink"),
   googlePhotosState: $("#googlePhotosState"),
   googlePhotosConnectBtn: $("#googlePhotosConnectBtn"),
   googlePhotosSyncBtn: $("#googlePhotosSyncBtn")
@@ -52,6 +58,8 @@ let overallStats = { photos: 0, faces: 0 };
 let currentStats = { photos: 0, faces: 0 };
 let googlePhotosStatus = null;
 let adminPhotos = [];
+let galleryLink = "";
+let currentShareLinkText = "";
 
 document.addEventListener("DOMContentLoaded", init);
 
@@ -92,7 +100,9 @@ function bindEvents() {
   els.logoutBtn?.addEventListener("click", handleLogout);
   els.activityForm?.addEventListener("submit", handleCreateActivity);
   els.deleteActivityBtn?.addEventListener("click", deleteSelectedActivity);
+  els.saveGalleryLinkBtn?.addEventListener("click", saveGalleryLink);
   els.regenerateShareLinkBtn?.addEventListener("click", regenerateShareLink);
+  els.copyShareLinkBtn?.addEventListener("click", copyShareLink);
 
   els.activitySelect?.addEventListener("change", () => {
     updateDeleteActivityButton();
@@ -239,9 +249,11 @@ async function loadModels() {
 async function loadActivityIndex() {
   const body = await apiGet("/api/activities");
   activities = Array.isArray(body.activities) ? body.activities : [];
+  galleryLink = body.galleryUrl || galleryLink || "";
   overallStats = body.stats || { photos: 0, faces: 0 };
   renderActivityControls();
   updateSelectedStats();
+  renderUserSaveLink();
 }
 
 async function loadShareLink() {
@@ -252,6 +264,7 @@ async function loadShareLink() {
   try {
     const body = await apiGet("/api/admin/share-link");
     renderShareLink(body);
+    renderGalleryLink(body);
   } catch (error) {
     if (error.message === "UNAUTHORIZED") {
       window.location.href = "/admin.html";
@@ -271,6 +284,7 @@ async function regenerateShareLink() {
   try {
     const body = await apiPost("/api/admin/share-link/regenerate", {});
     renderShareLink(body);
+    renderGalleryLink(body);
     setStatus("สร้างลิงก์แจกแบบสุ่มใหม่แล้ว");
   } catch (error) {
     if (error.message === "UNAUTHORIZED") {
@@ -283,13 +297,107 @@ async function regenerateShareLink() {
   }
 }
 
+async function saveGalleryLink() {
+  if (!els.saveGalleryLinkBtn) {
+    return;
+  }
+
+  const value = els.galleryLinkInput?.value.trim() || "";
+  els.saveGalleryLinkBtn.disabled = true;
+
+  try {
+    const body = await apiPatch("/api/admin/share-link", { galleryUrl: value });
+    renderShareLink(body);
+    renderGalleryLink(body);
+    setStatus(
+      body.galleryUrl
+        ? "ตั้งค่าลิงก์รวม Google Photos แล้ว"
+        : "ล้างลิงก์รวม Google Photos แล้ว"
+    );
+  } catch (error) {
+    if (error.message === "UNAUTHORIZED") {
+      window.location.href = "/admin.html";
+      return;
+    }
+    setStatus(error.message || "ตั้งค่าลิงก์รวม Google Photos ไม่สำเร็จ");
+  } finally {
+    els.saveGalleryLinkBtn.disabled = false;
+  }
+}
+
 function renderShareLink(body) {
   if (!els.shareLink) {
     return;
   }
 
-  els.shareLink.href = body.url || body.path || "user.html";
-  els.shareLink.textContent = body.path || body.url || "/user.html";
+  currentShareLinkText = body.displayUrl || body.url || body.path || "user.html";
+  els.shareLink.href = body.localUrl || body.url || body.path || "user.html";
+  els.shareLink.textContent = currentShareLinkText;
+}
+
+function renderGalleryLink(body = {}) {
+  galleryLink = body.galleryUrl || "";
+
+  if (els.galleryLinkInput) {
+    els.galleryLinkInput.value = galleryLink;
+  }
+
+  if (els.galleryLinkState) {
+    els.galleryLinkState.textContent = galleryLink
+      ? "ผู้ใช้จะเห็นปุ่มบันทึก/เปิดลิงก์รวมนี้ในหน้า user"
+      : "ยังไม่ได้ใส่ลิงก์รวม Google Photos";
+  }
+
+  if (els.openGalleryLink) {
+    els.openGalleryLink.href = galleryLink || "#";
+    els.openGalleryLink.classList.toggle("hidden", !galleryLink);
+  }
+
+  renderUserSaveLink();
+}
+
+async function copyShareLink() {
+  const text = currentShareLinkText || els.shareLink?.textContent || "";
+  if (!text) {
+    return;
+  }
+
+  try {
+    await writeClipboardText(text);
+    setStatus("คัดลอกลิงก์แจกแล้ว");
+  } catch {
+    setStatus("คัดลอกลิงก์ไม่สำเร็จ");
+  }
+}
+
+async function writeClipboardText(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const input = document.createElement("textarea");
+  input.value = text;
+  input.setAttribute("readonly", "");
+  input.style.position = "fixed";
+  input.style.left = "-9999px";
+  document.body.append(input);
+  input.select();
+  const copied = document.execCommand("copy");
+  input.remove();
+
+  if (!copied) {
+    throw new Error("Copy failed");
+  }
+}
+
+function renderUserSaveLink() {
+  if (!els.userSaveLink) {
+    return;
+  }
+
+  els.userSaveLink.href = galleryLink || "#";
+  els.userSaveLink.classList.toggle("hidden", !galleryLink);
 }
 
 async function loadGooglePhotosStatus() {
@@ -413,82 +521,32 @@ function createAdminPhotoCard(photo) {
   const card = document.createElement("article");
   const media = document.createElement("div");
   const image = document.createElement("img");
-  const saveButton = document.createElement("button");
   const body = document.createElement("div");
   const title = document.createElement("strong");
   const meta = document.createElement("span");
-  const label = document.createElement("label");
-  const input = document.createElement("input");
   const actions = document.createElement("div");
-  const openLink = document.createElement("a");
   const deleteButton = document.createElement("button");
 
   card.className = "admin-photo-card";
   media.className = "admin-photo-media";
   body.className = "admin-photo-body";
   actions.className = "admin-photo-actions";
-  saveButton.className = "secondary-button small-button photo-save-button";
   deleteButton.className = "ghost-button";
 
   image.src = photo.imageUrl;
   image.alt = photo.name;
   title.textContent = photo.name;
   meta.textContent = `${photo.activityName || "กิจกรรม"} · ${photo.facesCount || 0} ใบหน้า`;
-  saveButton.type = "button";
-  saveButton.textContent = "บันทึก";
-  label.textContent = "ลิงก์ Google Photos";
-  input.type = "url";
-  input.placeholder = "วางลิงก์ Google Photos หรือ Drive ได้ที่นี่";
-  input.value = photo.googlePhotos?.productUrl || "";
   deleteButton.type = "button";
   deleteButton.textContent = "ลบรูป";
 
-  openLink.className = "admin-photo-link";
-  openLink.target = "_blank";
-  openLink.rel = "noopener";
-  openLink.textContent = "เปิดลิงก์";
-  if (photo.googlePhotos?.productUrl) {
-    openLink.href = photo.googlePhotos.productUrl;
-  } else {
-    openLink.classList.add("hidden");
-  }
-
-  saveButton.addEventListener("click", () => saveManualPhotoLink(photo.id, input.value, saveButton));
   deleteButton.addEventListener("click", () => deleteAdminPhoto(photo));
 
-  media.append(image, saveButton);
-  label.append(input);
-  actions.append(openLink, deleteButton);
-  body.append(title, meta, label, actions);
+  media.append(image);
+  actions.append(deleteButton);
+  body.append(title, meta, actions);
   card.append(media, body);
   return card;
-}
-
-async function saveManualPhotoLink(photoId, value, button) {
-  const originalText = button?.textContent || "";
-  if (button) {
-    button.disabled = true;
-    button.textContent = "กำลังบันทึก";
-  }
-
-  try {
-    await apiPatch(`/api/admin/photos/${encodeURIComponent(photoId)}`, {
-      googlePhotoUrl: value
-    });
-    await loadAdminPhotos();
-    setStatus("บันทึกลิงก์รูปแล้ว");
-  } catch (error) {
-    if (error.message === "UNAUTHORIZED") {
-      window.location.href = "/admin.html";
-      return;
-    }
-    setStatus(error.message || "บันทึกลิงก์รูปไม่สำเร็จ");
-  } finally {
-    if (button) {
-      button.disabled = false;
-      button.textContent = originalText || "บันทึก";
-    }
-  }
 }
 
 async function deleteAdminPhoto(photo) {
@@ -676,7 +734,6 @@ async function handleGalleryFiles(fileList) {
       );
       queueItem.querySelector("span").textContent =
         `อัปโหลดเข้า “${activity.name}” แล้ว · พบ ${payload.faces.length} ใบหน้า${googlePhotosNote}`;
-      addGooglePhotosLink(queueItem, uploadBody.photo?.googlePhotos?.productUrl);
     } catch (error) {
       console.error(error);
       queueItem.querySelector("span").textContent =
@@ -764,6 +821,8 @@ async function searchMatches() {
   });
 
   currentStats = searchBody.stats || currentStats;
+  galleryLink = searchBody.galleryUrl || galleryLink || "";
+  renderUserSaveLink();
   if (els.photoCount) {
     els.photoCount.textContent = currentStats.photos;
   }
@@ -806,16 +865,6 @@ function renderResults(results) {
     meta.textContent = `${result.photo.activityName || "กิจกรรม"} · ระยะ ${result.distance.toFixed(
       3
     )} · ความมั่นใจ ${Math.round(result.confidence * 100)}%`;
-
-    if (result.photo.googlePhotos?.productUrl) {
-      const link = document.createElement("a");
-      link.className = "result-link";
-      link.href = result.photo.googlePhotos.productUrl;
-      link.target = "_blank";
-      link.rel = "noopener";
-      link.textContent = "เปิด Google Photos";
-      card.querySelector(".result-meta").append(link);
-    }
 
     els.resultsGrid.append(card);
   }
@@ -874,20 +923,6 @@ function createQueueItem(name, state) {
   status.textContent = state;
   row.append(title, status);
   return row;
-}
-
-function addGooglePhotosLink(queueItem, productUrl) {
-  if (!queueItem || !productUrl) {
-    return;
-  }
-
-  const link = document.createElement("a");
-  link.className = "queue-link";
-  link.href = productUrl;
-  link.target = "_blank";
-  link.rel = "noopener";
-  link.textContent = "เปิด Google Photos";
-  queueItem.append(link);
 }
 
 function formatGooglePhotosQueueNote(status) {
@@ -961,7 +996,7 @@ function exportResults() {
       "distance",
       "confidence_percent",
       "image_url",
-      "google_photo_url",
+      "google_photo_gallery_url",
       "faces_in_photo"
     ],
     ...lastResults.map((result) => [
@@ -970,7 +1005,7 @@ function exportResults() {
       result.distance.toFixed(4),
       Math.round(result.confidence * 100),
       new URL(result.photo.imageUrl, window.location.origin).href,
-      result.photo.googlePhotos?.productUrl || "",
+      galleryLink || "",
       result.photo.facesCount || 0
     ])
   ];

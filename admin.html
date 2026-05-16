@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="หลังบ้านสำหรับสร้างโฟลเดอร์กิจกรรม อัปโหลดรูป และจัดการลิงก์รูปกิจกรรม"
+      content="หลังบ้านสำหรับสร้างโฟลเดอร์กิจกรรม อัปโหลดรูป และจัดการลิงก์รวม Google Photos"
     />
     <title>Admin Upload | School Face Finder</title>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" />
@@ -44,7 +44,7 @@
           <h1>อัปโหลดรูปกิจกรรม</h1>
           <p>
             สร้างโฟลเดอร์กิจกรรม เลือกกิจกรรม แล้วอัปโหลดรูปเข้าโฟลเดอร์นั้น
-            แอดมินสามารถใส่ลิงก์ Google Photos เอง ลบรูป และลบโฟลเดอร์ได้จากหน้านี้
+            แอดมินสามารถใส่ลิงก์รวม Google Photos เอง ลบรูป และลบโฟลเดอร์ได้จากหน้านี้
           </p>
         </div>
       </section>
@@ -109,23 +109,55 @@
 
         <div class="upload-actions">
           <button class="primary-button" id="savePhotosBtn" type="button">
-            บันทึกรูปและสร้างลิงก์ Google Photos
+            เลือกรูปอัปโหลด
           </button>
         </div>
 
         <div class="queue" id="queueList" aria-live="polite"></div>
       </section>
 
+      <section class="panel gallery-link-panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Google Photos link</p>
+            <h2>ลิงก์รวม Google Photos</h2>
+          </div>
+        </div>
+        <label class="field-label" for="galleryLinkInput">ใส่ลิงก์รวมอัลบั้ม/โฟลเดอร์</label>
+        <div class="inline-form">
+          <input
+            id="galleryLinkInput"
+            type="url"
+            placeholder="https://photos.app.goo.gl/..."
+          />
+          <button class="secondary-button" id="saveGalleryLinkBtn" type="button">
+            ตั้งค่าลิงก์รวม
+          </button>
+        </div>
+        <div class="button-row gallery-link-actions">
+          <a
+            class="secondary-button small-button hidden"
+            id="openGalleryLink"
+            href="#"
+            target="_blank"
+            rel="noopener"
+          >
+            เปิดลิงก์รวม
+          </a>
+          <p class="small-note" id="galleryLinkState">ยังไม่ได้ใส่ลิงก์รวม Google Photos</p>
+        </div>
+      </section>
+
       <section class="panel admin-library-panel">
         <div class="panel-header">
           <div>
             <p class="eyebrow">Photo management</p>
-            <h2>จัดการรูปและลิงก์ที่แอดมินใส่เอง</h2>
+            <h2>จัดการรูปในเว็บ</h2>
           </div>
         </div>
         <div class="empty-state" id="adminPhotoEmpty">
           <strong>ยังไม่มีรูปในโฟลเดอร์นี้</strong>
-          <span>อัปโหลดรูปก่อน แล้วระบบจะแสดงช่องใส่ลิงก์และปุ่มลบที่นี่</span>
+          <span>อัปโหลดรูปก่อน แล้วระบบจะแสดงปุ่มลบรูปที่นี่</span>
         </div>
         <div class="admin-photo-grid" id="adminPhotoGrid"></div>
       </section>
@@ -158,9 +190,14 @@
         <p class="small-note">
           <a id="shareLink" href="user.html">กำลังสร้างลิงก์สุ่ม</a>
         </p>
-        <button class="secondary-button small-button" id="regenerateShareLinkBtn" type="button">
-          สุ่มลิงก์ใหม่
-        </button>
+        <div class="button-row">
+          <button class="secondary-button small-button" id="copyShareLinkBtn" type="button">
+            คัดลอกลิงก์
+          </button>
+          <button class="secondary-button small-button" id="regenerateShareLinkBtn" type="button">
+            สุ่มลิงก์ใหม่
+          </button>
+        </div>
       </section>
     </main>
   </body>

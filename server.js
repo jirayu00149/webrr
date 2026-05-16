@@ -128,8 +128,10 @@ async function handleApi(request, response, url) {
   if (url.pathname === "/api/activities" && request.method === "GET") {
     const photos = await readPhotos();
     const activities = await readActivities();
+    const shareState = await readShareState();
     sendJson(response, 200, {
       activities: addActivityCounts(activities, photos),
+      galleryUrl: shareState.galleryUrl || "",
       stats: makeStats(photos)
     });
     return;
@@ -157,9 +159,11 @@ async function handleApi(request, response, url) {
     const matches = searchablePhotos
       .flatMap((photo) => findBestMatch(photo, descriptor, threshold))
       .sort((a, b) => a.distance - b.distance);
+    const shareState = await readShareState();
 
     sendJson(response, 200, {
       matches,
+      galleryUrl: shareState.galleryUrl || "",
       stats: makeStats(searchablePhotos)
     });
     return;
@@ -317,13 +321,40 @@ async function handleApi(request, response, url) {
     return;
   }
 
+  if (url.pathname === "/api/admin/share-link" && request.method === "PATCH") {
+    if (!isAuthenticated(request)) {
+      sendJson(response, 401, { error: "Admin login required" });
+      return;
+    }
+
+    const body = await readJsonBody(request, 64 * 1024);
+    const rawGalleryUrl = body.galleryUrl || body.googlePhotosUrl || "";
+    const galleryUrl = sanitizeOptionalUrl(rawGalleryUrl);
+
+    if (String(rawGalleryUrl || "").trim() && !galleryUrl) {
+      sendJson(response, 400, { error: "Only http or https links are allowed" });
+      return;
+    }
+
+    const shareState = await readShareState();
+    shareState.galleryUrl = galleryUrl;
+    shareState.updatedAt = Date.now();
+    await writeShareState(shareState);
+    sendJson(response, 200, await makeShareLinkPayload(request, shareState));
+    return;
+  }
+
   if (url.pathname === "/api/admin/share-link/regenerate" && request.method === "POST") {
     if (!isAuthenticated(request)) {
       sendJson(response, 401, { error: "Admin login required" });
       return;
     }
 
-    const shareState = makeShareState();
+    const currentState = await readShareState();
+    const shareState = makeShareState({
+      galleryUrl: currentState.galleryUrl || "",
+      updatedAt: currentState.updatedAt || 0
+    });
     await writeShareState(shareState);
     sendJson(response, 200, await makeShareLinkPayload(request, shareState));
     return;
@@ -1187,10 +1218,12 @@ function htmlEscape(value) {
     .replaceAll("'", "&#039;");
 }
 
-function makeShareState() {
+function makeShareState(overrides = {}) {
   return {
     token: crypto.randomBytes(12).toString("hex"),
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    galleryUrl: sanitizeOptionalUrl(overrides.galleryUrl || ""),
+    updatedAt: Number(overrides.updatedAt || 0)
   };
 }
 
@@ -1198,6 +1231,9 @@ async function readShareState() {
   try {
     const state = JSON.parse(await fsp.readFile(shareFile, "utf8"));
     if (state?.token) {
+      state.createdAt = Number(state.createdAt || 0) || Date.now();
+      state.galleryUrl = sanitizeOptionalUrl(state.galleryUrl || state.googlePhotosUrl || "");
+      state.updatedAt = Number(state.updatedAt || 0);
       return state;
     }
   } catch {}
@@ -1214,11 +1250,16 @@ async function writeShareState(state) {
 async function makeShareLinkPayload(request, state = null) {
   const shareState = state || await readShareState();
   const pathName = `/s/${shareState.token}`;
+  const displayUrl = `www.photobss${pathName}`;
   return {
     token: shareState.token,
     path: pathName,
-    url: `${getOrigin(request)}${pathName}`,
-    createdAt: shareState.createdAt || 0
+    displayUrl,
+    url: `https://${displayUrl}`,
+    localUrl: `${getOrigin(request)}${pathName}`,
+    galleryUrl: shareState.galleryUrl || "",
+    createdAt: shareState.createdAt || 0,
+    updatedAt: shareState.updatedAt || 0
   };
 }
 
