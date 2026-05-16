@@ -8,7 +8,9 @@ const crypto = require("crypto");
 const root = __dirname;
 const port = Number(process.env.PORT || 8080);
 const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
-const dataDir = path.join(root, "data");
+const dataDir = process.env.DATA_DIR
+  ? path.resolve(process.env.DATA_DIR)
+  : path.join(root, "data");
 const uploadDir = path.join(dataDir, "uploads");
 const photosFile = path.join(dataDir, "photos.json");
 const activitiesFile = path.join(dataDir, "activities.json");
@@ -22,6 +24,7 @@ const defaultActivity = {
   slug: "general",
   createdAt: 0
 };
+defaultActivity.name = "ทั่วไป";
 const sessions = new Set();
 let googlePhotosAccessTokenCache = { token: "", expiresAt: 0 };
 

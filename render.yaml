@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: webrr
+    runtime: node
+    plan: free
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: ADMIN_PASSWORD
+        sync: false
