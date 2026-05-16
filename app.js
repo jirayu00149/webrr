@@ -434,7 +434,9 @@ function renderGooglePhotosStatus() {
   const messages = {
     ready: `พร้อมซิงก์ Google Photos.${counts}${failed}`,
     not_connected: "ตั้งค่า OAuth แล้ว แต่ยังไม่ได้เชื่อมบัญชี Google Photos",
-    not_configured: "ยังไม่ได้ตั้งค่า Google Photos: ใส่ client id และ client secret ก่อน",
+    not_configured: galleryLink
+      ? "ตั้งค่าลิงก์รวมแล้ว แต่ยังไม่ซิงก์อัตโนมัติ เพราะยังไม่ได้ใส่ Google client id และ client secret"
+      : "ยังไม่ได้ตั้งค่า Google Photos: ใส่ client id และ client secret ก่อน",
     disabled: "ปิดการซิงก์ Google Photos อยู่",
     error: "อ่านสถานะ Google Photos ไม่สำเร็จ",
     loading: "กำลังตรวจสถานะ Google Photos"
@@ -453,9 +455,15 @@ function renderGooglePhotosStatus() {
   if (els.googlePhotosSyncBtn) {
     els.googlePhotosSyncBtn.disabled =
       status.state !== "ready" || !status.unsynced || status.unsynced < 1;
-    els.googlePhotosSyncBtn.textContent = status.unsynced
-      ? `ซิงก์รูปที่ค้าง (${status.unsynced})`
-      : "ซิงก์รูปที่ค้าง";
+    if (status.state === "not_configured") {
+      els.googlePhotosSyncBtn.textContent = "ต้องตั้งค่า Google Photos ก่อน";
+    } else if (status.state === "not_connected") {
+      els.googlePhotosSyncBtn.textContent = "เชื่อมต่อ Google Photos ก่อน";
+    } else {
+      els.googlePhotosSyncBtn.textContent = status.unsynced
+        ? `ซิงก์รูปที่ค้าง (${status.unsynced})`
+        : "ซิงก์รูปที่ค้าง";
+    }
   }
 }
 

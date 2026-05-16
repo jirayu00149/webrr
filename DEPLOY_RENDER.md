@@ -12,6 +12,11 @@ This project must run as a Render **Web Service**, not a Static Site. The browse
    - Start command: `npm start`
 4. Add an environment variable:
    - `ADMIN_PASSWORD`: your real admin password
+   - Optional, for automatic Google Photos sync:
+     - `GOOGLE_PHOTOS_CLIENT_ID`
+     - `GOOGLE_PHOTOS_CLIENT_SECRET`
+     - `GOOGLE_PHOTOS_REFRESH_TOKEN` (added after OAuth connect, or set manually)
+     - `GOOGLE_PHOTOS_ALBUM_ID` (optional target album)
 5. Deploy, then open:
    - Public page: `https://YOUR-SERVICE.onrender.com/user.html`
    - Admin page: `https://YOUR-SERVICE.onrender.com/admin.html`
