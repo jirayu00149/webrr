@@ -18,8 +18,10 @@ const shareFile = path.join(dataDir, "share.json");
 const googlePhotosConfigFile = path.join(root, "googlePhotosConfig.json");
 const googlePhotosRuntimeConfigFile = path.join(dataDir, "google-photos-config.json");
 const googlePhotosTokenFile = path.join(dataDir, "google-photos-token.json");
+const googleDriveRuntimeConfigFile = path.join(dataDir, "google-drive-config.json");
 const googlePhotosOAuthStateCookie = "sff_google_photos_state";
 const googlePhotosScope = "https://www.googleapis.com/auth/photoslibrary.appendonly";
+const googleDriveScope = "https://www.googleapis.com/auth/drive.file";
 const defaultActivity = {
   id: "general",
   name: "ทั่วไป",
@@ -29,6 +31,7 @@ const defaultActivity = {
 defaultActivity.name = "ทั่วไป";
 const sessions = new Set();
 let googlePhotosAccessTokenCache = { token: "", expiresAt: 0 };
+let googleDriveAccessTokenCache = { token: "", key: "", expiresAt: 0 };
 
 const contentTypes = {
   ".css": "text/css; charset=utf-8",
@@ -372,6 +375,48 @@ async function handleApi(request, response, url) {
     return;
   }
 
+  if (url.pathname === "/api/admin/google-drive" && request.method === "GET") {
+    if (!isAuthenticated(request)) {
+      sendJson(response, 401, { error: "Admin login required" });
+      return;
+    }
+
+    const photos = await readPhotos();
+    const summary = makeGoogleDriveSummary(photos);
+    await updateShareGalleryFromDrive(summary.folderUrl);
+    sendJson(response, 200, { googleDrive: summary });
+    return;
+  }
+
+  if (url.pathname === "/api/admin/google-drive/config" && request.method === "GET") {
+    if (!isAuthenticated(request)) {
+      sendJson(response, 401, { error: "Admin login required" });
+      return;
+    }
+
+    sendJson(response, 200, { config: publicGoogleDriveConfig() });
+    return;
+  }
+
+  if (url.pathname === "/api/admin/google-drive/config" && request.method === "PATCH") {
+    if (!isAuthenticated(request)) {
+      sendJson(response, 401, { error: "Admin login required" });
+      return;
+    }
+
+    const body = await readJsonBody(request, 256 * 1024);
+    const result = await updateGoogleDriveRuntimeConfig(body);
+    const photos = await readPhotos();
+    const summary = makeGoogleDriveSummary(photos);
+    await updateShareGalleryFromDrive(summary.folderUrl);
+    sendJson(response, result.ok ? 200 : 400, {
+      ...result,
+      config: publicGoogleDriveConfig(),
+      googleDrive: makeGoogleDriveSummary(photos)
+    });
+    return;
+  }
+
   if (url.pathname === "/api/admin/google-photos/config" && request.method === "GET") {
     if (!isAuthenticated(request)) {
       sendJson(response, 401, { error: "Admin login required" });
@@ -421,6 +466,17 @@ async function handleApi(request, response, url) {
     }
 
     const result = await syncGooglePhotosBacklog();
+    sendJson(response, result.ok ? 200 : 400, result);
+    return;
+  }
+
+  if (url.pathname === "/api/admin/google-drive/sync" && request.method === "POST") {
+    if (!isAuthenticated(request)) {
+      sendJson(response, 401, { error: "Admin login required" });
+      return;
+    }
+
+    const result = await syncGoogleDriveBacklog();
     sendJson(response, result.ok ? 200 : 400, result);
     return;
   }
@@ -483,13 +539,10 @@ async function saveUploadedPhoto(body, activity) {
     faces: body.faces.map(normalizeFace).filter(Boolean)
   };
 
-  const manualGooglePhotoUrl = sanitizeOptionalUrl(body.googlePhotoUrl || body.productUrl || "");
-  record.googlePhotos = manualGooglePhotoUrl
-    ? makeManualGooglePhoto(manualGooglePhotoUrl)
-    : await mirrorPhotoToGooglePhotos(record, imageBuffer, {
-        fileName,
-        mimeType
-      });
+  record.googleDrive = await mirrorPhotoToGoogleDrive(record, imageBuffer, {
+    fileName,
+    mimeType
+  });
 
   photos.push(record);
   await writePhotos(photos);
@@ -758,6 +811,470 @@ function boolFrom(value, fallback) {
   }
 
   return fallback;
+}
+
+function getGoogleDriveConfig() {
+  const runtimeConfig = readJsonFileSync(googleDriveRuntimeConfigFile);
+  const serviceAccount = parseServiceAccount(
+    process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON ||
+      process.env.GOOGLE_SERVICE_ACCOUNT_JSON ||
+      runtimeConfig.serviceAccountJson ||
+      runtimeConfig.serviceAccount ||
+      null
+  );
+  const folderId = extractGoogleDriveFolderId(
+    process.env.GOOGLE_DRIVE_FOLDER_ID ||
+      runtimeConfig.folderId ||
+      runtimeConfig.folderUrl ||
+      ""
+  );
+  const enabled = boolFrom(
+    process.env.GOOGLE_DRIVE_ENABLED ?? runtimeConfig.enabled,
+    Boolean(serviceAccount && folderId)
+  );
+
+  return {
+    enabled,
+    serviceAccount,
+    folderId,
+    folderUrl: folderId ? `https://drive.google.com/drive/folders/${folderId}` : "",
+    configured: Boolean(serviceAccount && folderId)
+  };
+}
+
+function parseServiceAccount(value) {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === "object") {
+    return value.client_email && value.private_key ? value : null;
+  }
+
+  try {
+    const parsed = JSON.parse(String(value));
+    return parsed.client_email && parsed.private_key ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function publicGoogleDriveConfig() {
+  const config = getGoogleDriveConfig();
+  return {
+    enabled: config.enabled,
+    folderId: config.folderId,
+    folderUrl: config.folderUrl,
+    hasServiceAccount: Boolean(config.serviceAccount),
+    serviceAccountEmail: config.serviceAccount?.client_email || "",
+    usingEnv:
+      Boolean(process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON || process.env.GOOGLE_SERVICE_ACCOUNT_JSON) ||
+      Boolean(process.env.GOOGLE_DRIVE_FOLDER_ID)
+  };
+}
+
+async function updateGoogleDriveRuntimeConfig(body) {
+  const next = readJsonFileSync(googleDriveRuntimeConfigFile);
+  next.enabled = Object.prototype.hasOwnProperty.call(body, "enabled")
+    ? Boolean(body.enabled)
+    : true;
+
+  if (Object.prototype.hasOwnProperty.call(body, "folderId")) {
+    next.folderId = extractGoogleDriveFolderId(body.folderId);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, "serviceAccountJson")) {
+    const serviceAccountJson = String(body.serviceAccountJson || "").trim();
+    if (serviceAccountJson) {
+      const serviceAccount = parseServiceAccount(serviceAccountJson);
+      if (!serviceAccount) {
+        return { ok: false, error: "Service Account JSON ไม่ถูกต้อง" };
+      }
+      next.serviceAccount = serviceAccount;
+      delete next.serviceAccountJson;
+    }
+  }
+
+  if (!next.serviceAccount?.client_email || !next.serviceAccount?.private_key) {
+    return { ok: false, error: "กรุณาใส่ Service Account JSON" };
+  }
+
+  if (!next.folderId) {
+    return { ok: false, error: "กรุณาใส่ Google Drive Folder ID หรือ URL" };
+  }
+
+  await fsp.mkdir(dataDir, { recursive: true });
+  await fsp.writeFile(
+    googleDriveRuntimeConfigFile,
+    `${JSON.stringify(next, null, 2)}\n`,
+    "utf8"
+  );
+  return { ok: true };
+}
+
+function extractGoogleDriveFolderId(value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return "";
+  }
+
+  const folderMatch = text.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  if (folderMatch) {
+    return folderMatch[1];
+  }
+
+  try {
+    const url = new URL(text);
+    const id = url.searchParams.get("id");
+    if (id) {
+      return id;
+    }
+  } catch {}
+
+  return text.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 180);
+}
+
+function makeGoogleDriveSummary(photos) {
+  const config = getGoogleDriveConfig();
+  let state = "ready";
+
+  if (!config.configured) {
+    state = "not_configured";
+  } else if (!config.enabled) {
+    state = "disabled";
+  }
+
+  const saved = photos.filter((photo) => photo.googleDrive?.status === "saved").length;
+  const failed = photos.filter((photo) => photo.googleDrive?.status === "failed").length;
+  const unsynced = photos.filter((photo) => photo.googleDrive?.status !== "saved").length;
+
+  return {
+    state,
+    enabled: config.enabled,
+    configured: config.configured,
+    folderId: config.folderId,
+    folderUrl: config.folderUrl,
+    serviceAccountEmail: config.serviceAccount?.client_email || "",
+    total: photos.length,
+    saved,
+    failed,
+    unsynced,
+    syncUrl: "/api/admin/google-drive/sync"
+  };
+}
+
+function publicGoogleDriveState(googleDrive) {
+  if (!googleDrive || typeof googleDrive !== "object") {
+    return { status: "unsynced" };
+  }
+
+  return {
+    status: googleDrive.status || "unsynced",
+    fileId: googleDrive.fileId || "",
+    webViewLink: googleDrive.webViewLink || "",
+    folderId: googleDrive.folderId || "",
+    folderUrl: googleDrive.folderUrl || "",
+    syncedAt: googleDrive.syncedAt || 0,
+    updatedAt: googleDrive.updatedAt || 0,
+    error: googleDrive.error || ""
+  };
+}
+
+async function mirrorPhotoToGoogleDrive(photo, imageBuffer, options = {}) {
+  const config = getGoogleDriveConfig();
+
+  if (!config.configured) {
+    return {
+      status: "not_configured",
+      updatedAt: Date.now()
+    };
+  }
+
+  if (!config.enabled) {
+    return {
+      status: "disabled",
+      updatedAt: Date.now()
+    };
+  }
+
+  try {
+    const mimeType = options.mimeType || getPhotoMimeType(photo);
+    const fileName = sanitizeGooglePhotosFileName(options.fileName || photo.fileName || photo.name);
+    const accessToken = await getGoogleDriveAccessToken(config);
+    const folder = await getGoogleDrivePhotoFolder(photo, config, accessToken);
+    const file = await uploadGoogleDriveFile(accessToken, {
+      imageBuffer,
+      mimeType,
+      fileName,
+      folderId: folder.id
+    });
+
+    return {
+      status: "saved",
+      fileId: file.id || "",
+      webViewLink: file.webViewLink || "",
+      folderId: folder.id,
+      folderUrl: folder.url,
+      syncedAt: Date.now()
+    };
+  } catch (error) {
+    console.error("Google Drive upload failed:", error);
+    return {
+      status: "failed",
+      error: sanitizeGoogleError(error),
+      updatedAt: Date.now()
+    };
+  }
+}
+
+async function syncGoogleDriveBacklog() {
+  const photos = await readPhotos();
+  const summary = makeGoogleDriveSummary(photos);
+
+  if (summary.state !== "ready") {
+    return {
+      ok: false,
+      error: "Google Drive is not configured",
+      googleDrive: summary
+    };
+  }
+
+  let synced = 0;
+  let failed = 0;
+  let skipped = 0;
+
+  for (const photo of photos) {
+    if (photo.googleDrive?.status === "saved") {
+      skipped += 1;
+      continue;
+    }
+
+    const filePath = getLocalPhotoPath(photo);
+    if (!filePath) {
+      photo.googleDrive = {
+        status: "failed",
+        error: "Local file path is invalid",
+        updatedAt: Date.now()
+      };
+      failed += 1;
+      continue;
+    }
+
+    try {
+      const imageBuffer = await fsp.readFile(filePath);
+      photo.googleDrive = await mirrorPhotoToGoogleDrive(photo, imageBuffer, {
+        fileName: photo.fileName,
+        mimeType: getPhotoMimeType(photo)
+      });
+
+      if (photo.googleDrive.status === "saved") {
+        synced += 1;
+      } else {
+        failed += 1;
+      }
+    } catch (error) {
+      photo.googleDrive = {
+        status: "failed",
+        error: sanitizeGoogleError(error),
+        updatedAt: Date.now()
+      };
+      failed += 1;
+    }
+
+    await writePhotos(photos);
+  }
+
+  await writePhotos(photos);
+  return {
+    ok: true,
+    synced,
+    failed,
+    skipped,
+    googleDrive: makeGoogleDriveSummary(photos)
+  };
+}
+
+async function getGoogleDriveAccessToken(config) {
+  const cacheKey = `${config.serviceAccount.client_email}:${config.folderId}`;
+  if (
+    googleDriveAccessTokenCache.token &&
+    googleDriveAccessTokenCache.key === cacheKey &&
+    googleDriveAccessTokenCache.expiresAt > Date.now() + 60 * 1000
+  ) {
+    return googleDriveAccessTokenCache.token;
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const assertion = makeServiceAccountJwt(config.serviceAccount, {
+    scope: googleDriveScope,
+    iat: now,
+    exp: now + 3600
+  });
+  const body = new URLSearchParams({
+    grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+    assertion
+  }).toString();
+  const token = await requestJson("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Content-Length": Buffer.byteLength(body)
+    }
+  }, body);
+
+  if (!token.access_token) {
+    throw new Error("Google did not return a Drive access token.");
+  }
+
+  googleDriveAccessTokenCache = {
+    token: token.access_token,
+    key: cacheKey,
+    expiresAt: Date.now() + Number(token.expires_in || 3600) * 1000
+  };
+  return token.access_token;
+}
+
+async function getGoogleDrivePhotoFolder(photo, config, accessToken) {
+  const activities = await readActivities();
+  const activity = activities.find((item) => item.id === photo.activityId);
+
+  if (!activity) {
+    return {
+      id: config.folderId,
+      url: config.folderUrl
+    };
+  }
+
+  if (activity.googleDriveFolderId) {
+    return {
+      id: activity.googleDriveFolderId,
+      url:
+        activity.googleDriveFolderUrl ||
+        `https://drive.google.com/drive/folders/${activity.googleDriveFolderId}`
+    };
+  }
+
+  const folderName = sanitizeGoogleDriveFolderName(activity.name || photo.activityName || "activity");
+  const folder = await createGoogleDriveFolder(accessToken, {
+    name: folderName,
+    parentId: config.folderId
+  });
+  const folderId = folder.id || "";
+  const folderUrl = folder.webViewLink || `https://drive.google.com/drive/folders/${folderId}`;
+
+  if (!folderId) {
+    throw new Error("Google Drive did not create an activity folder.");
+  }
+
+  activity.googleDriveFolderId = folderId;
+  activity.googleDriveFolderUrl = folderUrl;
+  await writeActivities(activities);
+
+  return {
+    id: folderId,
+    url: folderUrl
+  };
+}
+
+function sanitizeGoogleDriveFolderName(name) {
+  const safeName = String(name || "activity")
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .trim()
+    .slice(0, 180);
+  return safeName || "activity";
+}
+
+async function createGoogleDriveFolder(accessToken, options) {
+  const body = JSON.stringify({
+    name: options.name,
+    mimeType: "application/vnd.google-apps.folder",
+    parents: [options.parentId]
+  });
+
+  return requestJson(
+    "https://www.googleapis.com/drive/v3/files?fields=id,name,webViewLink",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json; charset=UTF-8",
+        "Content-Length": Buffer.byteLength(body)
+      }
+    },
+    body
+  );
+}
+
+function makeServiceAccountJwt(serviceAccount, options) {
+  const header = base64UrlJson({ alg: "RS256", typ: "JWT" });
+  const claim = base64UrlJson({
+    iss: serviceAccount.client_email,
+    scope: options.scope,
+    aud: "https://oauth2.googleapis.com/token",
+    iat: options.iat,
+    exp: options.exp
+  });
+  const input = `${header}.${claim}`;
+  const signer = crypto.createSign("RSA-SHA256");
+  signer.update(input);
+  signer.end();
+  const signature = signer.sign(serviceAccount.private_key);
+  return `${input}.${base64Url(signature)}`;
+}
+
+function base64UrlJson(value) {
+  return base64Url(Buffer.from(JSON.stringify(value), "utf8"));
+}
+
+function base64Url(buffer) {
+  return buffer
+    .toString("base64")
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replace(/=+$/g, "");
+}
+
+async function uploadGoogleDriveFile(accessToken, options) {
+  const boundary = `sff_drive_${crypto.randomBytes(12).toString("hex")}`;
+  const metadata = {
+    name: options.fileName,
+    mimeType: options.mimeType,
+    parents: [options.folderId]
+  };
+  const start = Buffer.from(
+    `--${boundary}\r\n` +
+      "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
+      `${JSON.stringify(metadata)}\r\n` +
+      `--${boundary}\r\n` +
+      `Content-Type: ${options.mimeType}\r\n\r\n`,
+    "utf8"
+  );
+  const end = Buffer.from(`\r\n--${boundary}--\r\n`, "utf8");
+  const body = Buffer.concat([start, options.imageBuffer, end]);
+
+  return requestJson(
+    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": `multipart/related; boundary=${boundary}`,
+        "Content-Length": body.length
+      }
+    },
+    body
+  );
+}
+
+async function updateShareGalleryFromDrive(folderUrl) {
+  if (!folderUrl) {
+    return;
+  }
+
+  const shareState = await readShareState();
+  shareState.galleryUrl = folderUrl;
+  shareState.updatedAt = Date.now();
+  await writeShareState(shareState);
 }
 
 function makeGooglePhotosSummary(photos) {
@@ -1390,6 +1907,7 @@ function adminPhoto(photo) {
     activityId: photo.activityId,
     activityName: photo.activityName,
     facesCount: photo.faces.length,
+    googleDrive: publicGoogleDriveState(photo.googleDrive),
     googlePhotos: publicGooglePhotoState(photo.googlePhotos)
   };
 }
@@ -1406,6 +1924,7 @@ function searchPhoto(photo) {
     activityId: photo.activityId,
     activityName: photo.activityName,
     facesCount: photo.faces.length,
+    googleDrive: publicGoogleDriveState(photo.googleDrive),
     googlePhotos: publicGooglePhotoState(photo.googlePhotos)
   };
 }

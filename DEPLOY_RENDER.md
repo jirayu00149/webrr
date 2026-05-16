@@ -12,14 +12,16 @@ This project must run as a Render **Web Service**, not a Static Site. The browse
    - Start command: `npm start`
 4. Add an environment variable:
    - `ADMIN_PASSWORD`: your real admin password
+   - Recommended, for automatic Google Drive sync:
+     - `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON`
+     - `GOOGLE_DRIVE_FOLDER_ID`
    - Optional, for automatic Google Photos sync:
      - `GOOGLE_PHOTOS_CLIENT_ID`
      - `GOOGLE_PHOTOS_CLIENT_SECRET`
      - `GOOGLE_PHOTOS_REFRESH_TOKEN` (added after OAuth connect, or set manually)
      - `GOOGLE_PHOTOS_ALBUM_ID` (optional target album)
-   You can also enter the Google Photos Client ID and Client Secret from the admin page. The server stores them in `DATA_DIR/google-photos-config.json`, then sends you to Google OAuth to connect the account.
-   In Google Console, add this Authorized redirect URI:
-   `https://YOUR-SERVICE.onrender.com/api/google-photos/oauth/callback`
+   You can also enter the Google Drive Service Account JSON and one main Folder ID from the admin page. The server stores them in `DATA_DIR/google-drive-config.json`.
+   Share the main Google Drive folder with the service account email as Editor before syncing. The app creates one subfolder per activity automatically, so you do not need to change the folder link for every event.
 5. Deploy, then open:
    - Public page: `https://YOUR-SERVICE.onrender.com/user.html`
    - Admin page: `https://YOUR-SERVICE.onrender.com/admin.html`

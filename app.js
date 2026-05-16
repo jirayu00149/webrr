@@ -45,14 +45,12 @@ const els = {
   regenerateShareLinkBtn: $("#regenerateShareLinkBtn"),
   copyShareLinkBtn: $("#copyShareLinkBtn"),
   userSaveLink: $("#userSaveLink"),
-  googlePhotosState: $("#googlePhotosState"),
-  googlePhotosConnectBtn: $("#googlePhotosConnectBtn"),
-  googlePhotosSyncBtn: $("#googlePhotosSyncBtn"),
-  googleClientIdInput: $("#googleClientIdInput"),
-  googleClientSecretInput: $("#googleClientSecretInput"),
-  googleAlbumIdInput: $("#googleAlbumIdInput"),
-  saveGoogleConfigBtn: $("#saveGoogleConfigBtn"),
-  googleRedirectUri: $("#googleRedirectUri")
+  googleDriveState: $("#googleDriveState"),
+  googleDriveSyncBtn: $("#googleDriveSyncBtn"),
+  googleDriveServiceAccountInput: $("#googleDriveServiceAccountInput"),
+  googleDriveFolderIdInput: $("#googleDriveFolderIdInput"),
+  googleDriveFolderLink: $("#googleDriveFolderLink"),
+  saveGoogleDriveConfigBtn: $("#saveGoogleDriveConfigBtn")
 };
 
 let modelsReady = false;
@@ -61,7 +59,7 @@ let lastResults = [];
 let activities = [];
 let overallStats = { photos: 0, faces: 0 };
 let currentStats = { photos: 0, faces: 0 };
-let googlePhotosStatus = null;
+let googleDriveStatus = null;
 let adminPhotos = [];
 let galleryLink = "";
 let currentShareLinkText = "";
@@ -71,8 +69,6 @@ document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
   bindEvents();
-  renderGoogleRedirectUri();
-
   if (page === "login") {
     els.adminPassword?.focus();
     return;
@@ -82,8 +78,8 @@ async function init() {
     await loadActivityIndex();
     if (page === "admin") {
       await loadShareLink();
-      await loadGooglePhotosConfig();
-      await loadGooglePhotosStatus();
+      await loadGoogleDriveConfig();
+      await loadGoogleDriveStatus();
       await loadAdminPhotos();
     }
 
@@ -169,8 +165,8 @@ function bindEvents() {
   els.searchBtn?.addEventListener("click", searchMatches);
   els.consentCheck?.addEventListener("change", updateSearchButton);
   els.exportBtn?.addEventListener("click", exportResults);
-  els.googlePhotosSyncBtn?.addEventListener("click", syncGooglePhotosBacklog);
-  els.saveGoogleConfigBtn?.addEventListener("click", saveGooglePhotosConfig);
+  els.googleDriveSyncBtn?.addEventListener("click", syncGoogleDriveBacklog);
+  els.saveGoogleDriveConfigBtn?.addEventListener("click", saveGoogleDriveConfig);
 }
 
 async function handleLogin(event) {
@@ -320,15 +316,15 @@ async function saveGalleryLink() {
     renderGalleryLink(body);
     setStatus(
       body.galleryUrl
-        ? "ตั้งค่าลิงก์รวม Google Photos แล้ว"
-        : "ล้างลิงก์รวม Google Photos แล้ว"
+        ? "ตั้งค่าลิงก์รวมแล้ว"
+        : "ล้างลิงก์รวมแล้ว"
     );
   } catch (error) {
     if (error.message === "UNAUTHORIZED") {
       window.location.href = "/admin.html";
       return;
     }
-    setStatus(error.message || "ตั้งค่าลิงก์รวม Google Photos ไม่สำเร็จ");
+    setStatus(error.message || "ตั้งค่าลิงก์รวมไม่สำเร็จ");
   } finally {
     els.saveGalleryLinkBtn.disabled = false;
   }
@@ -355,7 +351,7 @@ function renderGalleryLink(body = {}) {
   if (els.galleryLinkState) {
     els.galleryLinkState.textContent = galleryLink
       ? "ผู้ใช้จะเห็นปุ่มบันทึก/เปิดลิงก์รวมนี้ในหน้า user"
-      : "ยังไม่ได้ใส่ลิงก์รวม Google Photos";
+      : "ยังไม่ได้ใส่ลิงก์รวม";
   }
 
   if (els.openGalleryLink) {
@@ -410,21 +406,14 @@ function renderUserSaveLink() {
   els.userSaveLink.classList.toggle("hidden", !galleryLink);
 }
 
-function renderGoogleRedirectUri() {
-  if (els.googleRedirectUri) {
-    els.googleRedirectUri.textContent =
-      `${window.location.origin}/api/google-photos/oauth/callback`;
-  }
-}
-
-async function loadGooglePhotosConfig() {
-  if (!els.googleClientIdInput) {
+async function loadGoogleDriveConfig() {
+  if (!els.googleDriveServiceAccountInput) {
     return;
   }
 
   try {
-    const body = await apiGet("/api/admin/google-photos/config");
-    renderGooglePhotosConfig(body.config || {});
+    const body = await apiGet("/api/admin/google-drive/config");
+    renderGoogleDriveConfig(body.config || {});
   } catch (error) {
     if (error.message === "UNAUTHORIZED") {
       window.location.href = "/admin.html";
@@ -432,148 +421,130 @@ async function loadGooglePhotosConfig() {
   }
 }
 
-function renderGooglePhotosConfig(config) {
-  if (els.googleClientIdInput) {
-    els.googleClientIdInput.value = config.clientId || "";
+function renderGoogleDriveConfig(config) {
+  if (els.googleDriveServiceAccountInput) {
+    els.googleDriveServiceAccountInput.value = "";
+    els.googleDriveServiceAccountInput.placeholder = config.hasServiceAccount
+      ? "ตั้ง Service Account แล้ว เว้นว่างไว้ถ้าไม่เปลี่ยน"
+      : "วาง JSON key ของ Service Account ที่นี่";
   }
 
-  if (els.googleClientSecretInput) {
-    els.googleClientSecretInput.value = "";
-    els.googleClientSecretInput.placeholder = config.hasClientSecret
-      ? "ตั้งไว้แล้ว เว้นว่างไว้ถ้าไม่เปลี่ยน"
-      : "ใส่ Client Secret";
+  if (els.googleDriveFolderIdInput) {
+    els.googleDriveFolderIdInput.value = config.folderId || "";
   }
 
-  if (els.googleAlbumIdInput) {
-    els.googleAlbumIdInput.value = config.albumId || "";
+  if (els.googleDriveFolderLink) {
+    els.googleDriveFolderLink.href = config.folderUrl || "#";
+    els.googleDriveFolderLink.classList.toggle("hidden", !config.folderUrl);
   }
 }
 
-async function saveGooglePhotosConfig() {
-  if (!els.saveGoogleConfigBtn) {
+async function saveGoogleDriveConfig() {
+  if (!els.saveGoogleDriveConfigBtn) {
     return;
   }
 
   const payload = {
-    clientId: els.googleClientIdInput?.value.trim() || "",
-    clientSecret: els.googleClientSecretInput?.value.trim() || "",
-    albumId: els.googleAlbumIdInput?.value.trim() || "",
+    serviceAccountJson: els.googleDriveServiceAccountInput?.value.trim() || "",
+    folderId: els.googleDriveFolderIdInput?.value.trim() || "",
     enabled: true
   };
 
-  els.saveGoogleConfigBtn.disabled = true;
-  els.saveGoogleConfigBtn.textContent = "กำลังตั้งค่า...";
+  els.saveGoogleDriveConfigBtn.disabled = true;
+  els.saveGoogleDriveConfigBtn.textContent = "กำลังตั้งค่า...";
 
   try {
-    const body = await apiPatch("/api/admin/google-photos/config", payload);
-    renderGooglePhotosConfig(body.config || {});
-    googlePhotosStatus = body.googlePhotos || googlePhotosStatus;
-    renderGooglePhotosStatus();
-
-    if (body.googlePhotos?.oauthConfigured && !body.googlePhotos?.connected) {
-      window.location.href = body.googlePhotos.connectUrl || "/api/admin/google-photos/connect";
-      return;
-    }
-
-    setStatus("ตั้งค่า Google Photos แล้ว");
+    const body = await apiPatch("/api/admin/google-drive/config", payload);
+    renderGoogleDriveConfig(body.config || {});
+    googleDriveStatus = body.googleDrive || googleDriveStatus;
+    galleryLink = body.googleDrive?.folderUrl || galleryLink;
+    renderGalleryLink({ galleryUrl: galleryLink });
+    renderGoogleDriveStatus();
+    setStatus("ตั้งค่า Google Drive แล้ว");
   } catch (error) {
     if (error.message === "UNAUTHORIZED") {
       window.location.href = "/admin.html";
       return;
     }
-    setStatus(error.message || "ตั้งค่า Google Photos ไม่สำเร็จ");
+    setStatus(error.message || "ตั้งค่า Google Drive ไม่สำเร็จ");
   } finally {
-    els.saveGoogleConfigBtn.disabled = false;
-    els.saveGoogleConfigBtn.textContent = "บันทึกและเชื่อมต่อ";
+    els.saveGoogleDriveConfigBtn.disabled = false;
+    els.saveGoogleDriveConfigBtn.textContent = "บันทึก Drive";
   }
 }
 
-async function loadGooglePhotosStatus() {
-  if (!els.googlePhotosState) {
+async function loadGoogleDriveStatus() {
+  if (!els.googleDriveState) {
     return;
   }
 
   try {
-    const body = await apiGet("/api/admin/google-photos");
-    googlePhotosStatus = body.googlePhotos || null;
-    renderGooglePhotosStatus();
+    const body = await apiGet("/api/admin/google-drive");
+    googleDriveStatus = body.googleDrive || null;
+    renderGoogleDriveStatus();
   } catch (error) {
     if (error.message === "UNAUTHORIZED") {
       window.location.href = "/admin.html";
       return;
     }
-    googlePhotosStatus = { state: "error" };
-    renderGooglePhotosStatus();
+    googleDriveStatus = { state: "error" };
+    renderGoogleDriveStatus();
   }
 }
 
-function renderGooglePhotosStatus() {
-  if (!els.googlePhotosState) {
+function renderGoogleDriveStatus() {
+  if (!els.googleDriveState) {
     return;
   }
 
-  const status = googlePhotosStatus || { state: "loading" };
+  const status = googleDriveStatus || { state: "loading" };
   const counts = Number.isFinite(status.total)
-    ? ` เก็บใน Google Photos แล้ว ${status.saved}/${status.total} รูป`
+    ? ` เก็บใน Drive แล้ว ${status.saved}/${status.total} รูป`
     : "";
   const failed = status.failed ? `, ไม่สำเร็จ ${status.failed} รูป` : "";
   const messages = {
-    ready: `พร้อมซิงก์ Google Photos.${counts}${failed}`,
-    not_connected: "ตั้งค่า OAuth แล้ว แต่ยังไม่ได้เชื่อมบัญชี Google Photos",
-    not_configured: galleryLink
-      ? "ตั้งค่าลิงก์รวมแล้ว แต่ยังไม่ซิงก์อัตโนมัติ เพราะยังไม่ได้ใส่ Google client id และ client secret"
-      : "ยังไม่ได้ตั้งค่า Google Photos: ใส่ client id และ client secret ก่อน",
-    disabled: "ปิดการซิงก์ Google Photos อยู่",
-    error: "อ่านสถานะ Google Photos ไม่สำเร็จ",
-    loading: "กำลังตรวจสถานะ Google Photos"
+    ready: `พร้อมซิงก์ Google Drive.${counts}${failed}`,
+    not_configured: "ยังไม่ได้ตั้งค่า Google Drive: วาง Service Account JSON และโฟลเดอร์หลักก่อน",
+    disabled: "ปิดการซิงก์ Google Drive อยู่",
+    error: "อ่านสถานะ Google Drive ไม่สำเร็จ",
+    loading: "กำลังตรวจสถานะ Google Drive"
   };
 
-  els.googlePhotosState.textContent = messages[status.state] || messages.loading;
+  els.googleDriveState.textContent = messages[status.state] || messages.loading;
 
-  if (els.googlePhotosConnectBtn) {
-    els.googlePhotosConnectBtn.href = status.connectUrl || "/api/admin/google-photos/connect";
-    els.googlePhotosConnectBtn.classList.toggle(
-      "hidden",
-      !status.oauthConfigured || status.state === "ready" || status.state === "disabled"
-    );
-  }
-
-  if (els.googlePhotosSyncBtn) {
-    els.googlePhotosSyncBtn.disabled =
+  if (els.googleDriveSyncBtn) {
+    els.googleDriveSyncBtn.disabled =
       status.state !== "ready" || !status.unsynced || status.unsynced < 1;
-    if (status.state === "not_configured") {
-      els.googlePhotosSyncBtn.textContent = "ต้องตั้งค่า Google Photos ก่อน";
-    } else if (status.state === "not_connected") {
-      els.googlePhotosSyncBtn.textContent = "เชื่อมต่อ Google Photos ก่อน";
-    } else {
-      els.googlePhotosSyncBtn.textContent = status.unsynced
-        ? `ซิงก์รูปที่ค้าง (${status.unsynced})`
-        : "ซิงก์รูปที่ค้าง";
-    }
+    els.googleDriveSyncBtn.textContent =
+      status.state === "not_configured"
+        ? "ต้องตั้งค่า Google Drive ก่อน"
+        : status.unsynced
+          ? `ซิงก์รูปที่ค้าง (${status.unsynced})`
+          : "ซิงก์รูปที่ค้าง";
   }
 }
 
-async function syncGooglePhotosBacklog() {
-  if (!els.googlePhotosSyncBtn) {
+async function syncGoogleDriveBacklog() {
+  if (!els.googleDriveSyncBtn) {
     return;
   }
 
-  els.googlePhotosSyncBtn.disabled = true;
-  els.googlePhotosSyncBtn.textContent = "กำลังซิงก์...";
-  setStatus("กำลังซิงก์รูปที่ค้างไป Google Photos");
+  els.googleDriveSyncBtn.disabled = true;
+  els.googleDriveSyncBtn.textContent = "กำลังซิงก์...";
+  setStatus("กำลังซิงก์รูปที่ค้างไป Google Drive");
 
   try {
-    const body = await apiPost("/api/admin/google-photos/sync", {});
-    googlePhotosStatus = body.googlePhotos || googlePhotosStatus;
-    renderGooglePhotosStatus();
-    setStatus(`ซิงก์ Google Photos แล้ว ${body.synced || 0} รูป, ไม่สำเร็จ ${body.failed || 0} รูป`);
+    const body = await apiPost("/api/admin/google-drive/sync", {});
+    googleDriveStatus = body.googleDrive || googleDriveStatus;
+    renderGoogleDriveStatus();
+    setStatus(`ซิงก์ Google Drive แล้ว ${body.synced || 0} รูป, ไม่สำเร็จ ${body.failed || 0} รูป`);
   } catch (error) {
     if (error.message === "UNAUTHORIZED") {
       window.location.href = "/admin.html";
       return;
     }
-    await loadGooglePhotosStatus();
-    setStatus(error.message || "ซิงก์ Google Photos ไม่สำเร็จ");
+    await loadGoogleDriveStatus();
+    setStatus(error.message || "ซิงก์ Google Drive ไม่สำเร็จ");
   }
 }
 
@@ -657,7 +628,7 @@ async function deleteAdminPhoto(photo) {
       els.activitySelect.value = photo.activityId;
     }
     await loadAdminPhotos();
-    await loadGooglePhotosStatus();
+    await loadGoogleDriveStatus();
     setStatus("ลบรูปแล้ว");
   } catch (error) {
     if (error.message === "UNAUTHORIZED") {
@@ -690,7 +661,7 @@ async function deleteSelectedActivity() {
     await apiDelete(`/api/admin/activities/${encodeURIComponent(activity.id)}`);
     await loadActivityIndex();
     await loadAdminPhotos();
-    await loadGooglePhotosStatus();
+    await loadGoogleDriveStatus();
     setStatus(`ลบโฟลเดอร์ "${activity.name}" แล้ว`);
   } catch (error) {
     if (error.message === "UNAUTHORIZED") {
@@ -825,11 +796,11 @@ async function handleGalleryFiles(fileList) {
       };
 
       const uploadBody = await apiPost("/api/admin/photos", payload);
-      const googlePhotosNote = formatGooglePhotosQueueNote(
-        uploadBody.photo?.googlePhotos?.status
+      const googleDriveNote = formatGoogleDriveQueueNote(
+        uploadBody.photo?.googleDrive?.status
       );
       queueItem.querySelector("span").textContent =
-        `อัปโหลดเข้า “${activity.name}” แล้ว · พบ ${payload.faces.length} ใบหน้า${googlePhotosNote}`;
+        `อัปโหลดเข้า “${activity.name}” แล้ว · พบ ${payload.faces.length} ใบหน้า${googleDriveNote}`;
     } catch (error) {
       console.error(error);
       queueItem.querySelector("span").textContent =
@@ -846,7 +817,7 @@ async function handleGalleryFiles(fileList) {
 
   await loadActivityIndex();
   if (page === "admin") {
-    await loadGooglePhotosStatus();
+    await loadGoogleDriveStatus();
   }
   if (els.activitySelect) {
     els.activitySelect.value = activity.id;
@@ -1021,14 +992,13 @@ function createQueueItem(name, state) {
   return row;
 }
 
-function formatGooglePhotosQueueNote(status) {
+function formatGoogleDriveQueueNote(status) {
   const notes = {
-    saved: " · Google Photos แล้ว",
-    failed: " · Google Photos ไม่สำเร็จ",
-    disabled: " · Google Photos ปิดอยู่",
-    not_connected: " · รอเชื่อม Google Photos",
-    not_configured: " · รอตั้งค่า Google Photos",
-    unsynced: " · รอซิงก์ Google Photos"
+    saved: " · Google Drive แล้ว",
+    failed: " · Google Drive ไม่สำเร็จ",
+    disabled: " · Google Drive ปิดอยู่",
+    not_configured: " · รอตั้งค่า Google Drive",
+    unsynced: " · รอซิงก์ Google Drive"
   };
   return notes[status] || "";
 }

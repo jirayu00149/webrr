@@ -650,12 +650,23 @@ h2 {
   font-weight: 900;
 }
 
-.google-config-form input {
+.google-config-form input,
+.google-config-form textarea {
   width: 100%;
-  min-height: 42px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 0 12px;
+}
+
+.google-config-form input {
+  min-height: 42px;
+}
+
+.google-config-form textarea {
+  min-height: 140px;
+  padding-top: 10px;
+  font-family: Consolas, "Courier New", monospace;
+  resize: vertical;
 }
 
 .google-redirect-note {

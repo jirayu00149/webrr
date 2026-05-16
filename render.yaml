@@ -19,3 +19,7 @@ services:
         sync: false
       - key: GOOGLE_PHOTOS_ALBUM_ID
         sync: false
+      - key: GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: GOOGLE_DRIVE_FOLDER_ID
+        sync: false

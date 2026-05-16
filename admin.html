@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="หลังบ้านสำหรับสร้างโฟลเดอร์กิจกรรม อัปโหลดรูป และจัดการลิงก์รวม Google Photos"
+      content="Admin page for activity folders, uploads, and Google Drive sync"
     />
     <title>Admin Upload | School Face Finder</title>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" />
@@ -29,10 +29,10 @@
         </a>
         <div class="model-state" id="modelState" role="status">
           <span class="state-dot" aria-hidden="true"></span>
-          <span id="modelStateText">กำลังเตรียมโมเดล</span>
+          <span id="modelStateText">Preparing models</span>
         </div>
         <button class="secondary-button small-button" id="logoutBtn" type="button">
-          ออกจากระบบ
+          Logout
         </button>
       </div>
     </header>
@@ -41,18 +41,18 @@
       <section class="page-hero admin-upload-hero">
         <div>
           <p class="eyebrow">Admin only</p>
-          <h1>อัปโหลดรูปกิจกรรม</h1>
+          <h1>Activity Photo Upload</h1>
           <p>
-            สร้างโฟลเดอร์กิจกรรม เลือกกิจกรรม แล้วอัปโหลดรูปเข้าโฟลเดอร์นั้น
-            แอดมินสามารถใส่ลิงก์รวม Google Photos เอง ลบรูป และลบโฟลเดอร์ได้จากหน้านี้
+            Create an activity folder, upload photos, and let the server sync them
+            to Google Drive. The app creates one Drive subfolder per activity.
           </p>
         </div>
       </section>
 
       <section class="notice">
         <div>
-          <h2>ตรวจสิทธิ์ก่อนอัปโหลด</h2>
-          <p>ใช้เฉพาะรูปที่โรงเรียนได้รับอนุญาตให้จัดเก็บและค้นหาแล้วเท่านั้น</p>
+          <h2>Permission Check</h2>
+          <p>Use only photos that the school has permission to store and search.</p>
         </div>
       </section>
 
@@ -60,28 +60,28 @@
         <div class="panel-header">
           <div>
             <p class="eyebrow">Activity folders</p>
-            <h2>สร้างและเลือกโฟลเดอร์กิจกรรม</h2>
+            <h2>Create and Select Activity</h2>
           </div>
         </div>
 
         <form class="activity-form" id="activityForm">
-          <label for="activityName">ชื่อกิจกรรมใหม่</label>
+          <label for="activityName">New activity name</label>
           <div class="inline-form">
             <input
               id="activityName"
               type="text"
               maxlength="120"
-              placeholder="เช่น กีฬาสี 2569, วันไหว้ครู, ทัศนศึกษา"
+              placeholder="Sports Day 2026, Teacher Day, Field Trip"
             />
-            <button class="secondary-button" type="submit">สร้างโฟลเดอร์</button>
+            <button class="secondary-button" type="submit">Create Folder</button>
           </div>
         </form>
 
-        <label class="field-label" for="activitySelect">อัปโหลดและจัดการรูปในโฟลเดอร์</label>
+        <label class="field-label" for="activitySelect">Upload and manage photos in folder</label>
         <div class="inline-form">
           <select id="activitySelect" class="select-input"></select>
           <button class="ghost-button" id="deleteActivityBtn" type="button" disabled>
-            ลบโฟลเดอร์
+            Delete Folder
           </button>
         </div>
 
@@ -92,7 +92,7 @@
         <div class="panel-header">
           <div>
             <p class="eyebrow">Upload</p>
-            <h2>เพิ่มรูปลงคลัง public search</h2>
+            <h2>Add Photos to Public Search</h2>
           </div>
         </div>
 
@@ -103,13 +103,13 @@
               <path d="M12 16V4m0 0 4 4m-4-4-4 4M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2" />
             </svg>
           </span>
-          <strong>ลากรูปมาวาง หรือกดเพื่อเลือกไฟล์</strong>
-          <span>ระบบจะตรวจจับใบหน้าและบันทึกรูปลง server โดยแอดมินไม่ต้องติ๊กยืนยันซ้ำ</span>
+          <strong>Drop photos here or click to choose files</strong>
+          <span>The server will detect faces, save photos locally, and sync to Drive when configured.</span>
         </label>
 
         <div class="upload-actions">
           <button class="primary-button" id="savePhotosBtn" type="button">
-            เลือกรูปอัปโหลด
+            Choose Photos
           </button>
         </div>
 
@@ -119,19 +119,21 @@
       <section class="panel gallery-link-panel">
         <div class="panel-header">
           <div>
-            <p class="eyebrow">Google Photos link</p>
-            <h2>ลิงก์รวม Google Photos</h2>
+            <p class="eyebrow">Share link</p>
+            <h2>Main Link for Users</h2>
           </div>
         </div>
-        <label class="field-label" for="galleryLinkInput">ใส่ลิงก์รวมอัลบั้ม/โฟลเดอร์</label>
+        <label class="field-label" for="galleryLinkInput">
+          Optional custom album/folder link
+        </label>
         <div class="inline-form">
           <input
             id="galleryLinkInput"
             type="url"
-            placeholder="https://photos.app.goo.gl/..."
+            placeholder="https://drive.google.com/drive/folders/..."
           />
           <button class="secondary-button" id="saveGalleryLinkBtn" type="button">
-            ตั้งค่าลิงก์รวม
+            Save Main Link
           </button>
         </div>
         <div class="button-row gallery-link-actions">
@@ -142,9 +144,9 @@
             target="_blank"
             rel="noopener"
           >
-            เปิดลิงก์รวม
+            Open Main Link
           </a>
-          <p class="small-note" id="galleryLinkState">ยังไม่ได้ใส่ลิงก์รวม Google Photos</p>
+          <p class="small-note" id="galleryLinkState">No main link has been set</p>
         </div>
       </section>
 
@@ -152,68 +154,65 @@
         <div class="panel-header">
           <div>
             <p class="eyebrow">Photo management</p>
-            <h2>จัดการรูปในเว็บ</h2>
+            <h2>Manage Web Photos</h2>
           </div>
         </div>
         <div class="empty-state" id="adminPhotoEmpty">
-          <strong>ยังไม่มีรูปในโฟลเดอร์นี้</strong>
-          <span>อัปโหลดรูปก่อน แล้วระบบจะแสดงปุ่มลบรูปที่นี่</span>
+          <strong>No photos in this folder yet</strong>
+          <span>Upload photos first, then delete buttons will appear here.</span>
         </div>
         <div class="admin-photo-grid" id="adminPhotoGrid"></div>
       </section>
 
       <section class="panel status-card admin-status" aria-live="polite">
         <p class="eyebrow">Status</p>
-        <h2>สถานะอัปโหลด</h2>
-        <p id="statusText">รอโหลดโมเดลตรวจจับใบหน้า</p>
+        <h2>Upload Status</h2>
+        <p id="statusText">Waiting for face detection models</p>
         <div class="sync-status">
-          <p class="eyebrow">Google Photos</p>
-          <p class="small-note" id="googlePhotosState">กำลังตรวจสถานะ Google Photos</p>
+          <p class="eyebrow">Google Drive</p>
+          <p class="small-note" id="googleDriveState">Checking Google Drive status</p>
           <div class="button-row">
-            <a
-              class="secondary-button small-button hidden"
-              id="googlePhotosConnectBtn"
-              href="/api/admin/google-photos/connect"
-            >
-              เชื่อมต่อ Google Photos
-            </a>
-            <button class="secondary-button small-button" id="googlePhotosSyncBtn" type="button" disabled>
-              ซิงก์รูปที่ค้าง
+            <button class="secondary-button small-button" id="googleDriveSyncBtn" type="button" disabled>
+              Sync Pending Photos
             </button>
           </div>
           <div class="google-config-form">
             <label>
-              Google Photos Client ID
-              <input
-                id="googleClientIdInput"
-                type="text"
-                autocomplete="off"
-                placeholder="xxxxxxxx.apps.googleusercontent.com"
-              />
+              Service Account JSON
+              <textarea
+                id="googleDriveServiceAccountInput"
+                rows="7"
+                spellcheck="false"
+                wrap="soft"
+                placeholder="Paste the full Service Account JSON here"
+              ></textarea>
             </label>
             <label>
-              Google Photos Client Secret
+              Main Google Drive Folder ID or URL
               <input
-                id="googleClientSecretInput"
-                type="password"
-                autocomplete="new-password"
-                placeholder="ใส่ Client Secret"
-              />
-            </label>
-            <label>
-              Album ID (ไม่บังคับ)
-              <input
-                id="googleAlbumIdInput"
+                id="googleDriveFolderIdInput"
                 type="text"
                 autocomplete="off"
-                placeholder="เว้นว่างถ้าให้ Google Photos สร้างเอง"
+                placeholder="https://drive.google.com/drive/folders/..."
               />
             </label>
-            <button class="secondary-button small-button" id="saveGoogleConfigBtn" type="button">
-              บันทึกและเชื่อมต่อ
-            </button>
+            <div class="button-row">
+              <button class="secondary-button small-button" id="saveGoogleDriveConfigBtn" type="button">
+                Save Drive
+              </button>
+              <a
+                class="secondary-button small-button hidden"
+                id="googleDriveFolderLink"
+                href="#"
+                target="_blank"
+                rel="noopener"
+              >
+                Open Drive Folder
+              </a>
+            </div>
             <p class="small-note google-redirect-note">
-              Redirect URI: <code id="googleRedirectUri">/api/google-photos/oauth/callback</code>
+              Set one main folder only. The app creates subfolders by activity name.
+              Share the main folder with the Service Account email as Editor before syncing.
             </p>
           </div>
         </div>
@@ -221,16 +220,16 @@
 
       <section class="panel status-card admin-status">
         <p class="eyebrow">Share link</p>
-        <h2>ลิงก์สุ่มสำหรับแจก</h2>
+        <h2>Random Link to Share</h2>
         <p class="small-note">
-          <a id="shareLink" href="user.html">กำลังสร้างลิงก์สุ่ม</a>
+          <a id="shareLink" href="user.html">Creating random link</a>
         </p>
         <div class="button-row">
           <button class="secondary-button small-button" id="copyShareLinkBtn" type="button">
-            คัดลอกลิงก์
+            Copy Link
           </button>
           <button class="secondary-button small-button" id="regenerateShareLinkBtn" type="button">
-            สุ่มลิงก์ใหม่
+            New Random Link
           </button>
         </div>
       </section>

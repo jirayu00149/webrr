@@ -1,6 +1,7 @@
 googlePhotosConfig.json
 data/google-photos-config.json
 data/google-photos-token.json
+data/google-drive-config.json
 data/uploads/
 node_modules/
 .env
