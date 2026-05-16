@@ -1192,7 +1192,7 @@ async function createGoogleDriveFolder(accessToken, options) {
   });
 
   return requestJson(
-    "https://www.googleapis.com/drive/v3/files?fields=id,name,webViewLink",
+    "https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id,name,webViewLink",
     {
       method: "POST",
       headers: {
@@ -1253,7 +1253,7 @@ async function uploadGoogleDriveFile(accessToken, options) {
   const body = Buffer.concat([start, options.imageBuffer, end]);
 
   return requestJson(
-    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink",
+    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name,webViewLink",
     {
       method: "POST",
       headers: {

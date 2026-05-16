@@ -21,7 +21,8 @@ This project must run as a Render **Web Service**, not a Static Site. The browse
      - `GOOGLE_PHOTOS_REFRESH_TOKEN` (added after OAuth connect, or set manually)
      - `GOOGLE_PHOTOS_ALBUM_ID` (optional target album)
    You can also enter the Google Drive Service Account JSON and one main Folder ID from the admin page. The server stores them in `DATA_DIR/google-drive-config.json`.
-   Share the main Google Drive folder with the service account email as Editor before syncing. The app creates one subfolder per activity automatically, so you do not need to change the folder link for every event.
+   Service Account uploads need a Google Workspace Shared Drive folder. Add the service account email as Content manager or Editor on that Shared Drive folder before syncing. A normal personal "My Drive" folder can return `HTTP 403: Service Accounts do not have storage quota`.
+   The app creates one subfolder per activity automatically, so you do not need to change the folder link for every event.
 5. Deploy, then open:
    - Public page: `https://YOUR-SERVICE.onrender.com/user.html`
    - Admin page: `https://YOUR-SERVICE.onrender.com/admin.html`
