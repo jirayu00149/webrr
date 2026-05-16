@@ -576,10 +576,22 @@ h2 {
   margin-top: 14px;
 }
 
+.upload-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.upload-actions .primary-button {
+  width: auto;
+  min-width: 260px;
+}
+
 .queue-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
+  align-items: center;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 10px 12px;
@@ -594,6 +606,18 @@ h2 {
 
 .queue-item.failed span {
   color: var(--rose);
+}
+
+.queue-link {
+  grid-column: 1 / -1;
+  justify-self: start;
+  color: var(--primary);
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.queue-link:hover {
+  text-decoration: underline;
 }
 
 .side-stack {
@@ -777,6 +801,17 @@ input[type="range"] {
   display: grid;
   gap: 3px;
   padding: 13px;
+}
+
+.result-link {
+  margin-top: 6px;
+  color: var(--primary);
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.result-link:hover {
+  text-decoration: underline;
 }
 
 .hidden {

@@ -11,6 +11,7 @@ const els = {
   consentCheck: $("#consentCheck"),
   galleryInput: $("#galleryInput"),
   galleryDropzone: $("#galleryDropzone"),
+  savePhotosBtn: $("#savePhotosBtn"),
   queueList: $("#queueList"),
   referenceInput: $("#referenceInput"),
   referencePreview: $("#referencePreview"),
@@ -94,6 +95,10 @@ function bindEvents() {
       event.target.value = "";
     });
   }
+
+  els.savePhotosBtn?.addEventListener("click", () => {
+    els.galleryInput?.click();
+  });
 
   if (els.galleryDropzone) {
     ["dragenter", "dragover"].forEach((name) => {
@@ -423,6 +428,7 @@ async function handleGalleryFiles(fileList) {
       );
       queueItem.querySelector("span").textContent =
         `อัปโหลดเข้า “${activity.name}” แล้ว · พบ ${payload.faces.length} ใบหน้า${googlePhotosNote}`;
+      addGooglePhotosLink(queueItem, uploadBody.photo?.googlePhotos?.productUrl);
     } catch (error) {
       console.error(error);
       queueItem.querySelector("span").textContent =
@@ -552,6 +558,16 @@ function renderResults(results) {
       3
     )} · ความมั่นใจ ${Math.round(result.confidence * 100)}%`;
 
+    if (result.photo.googlePhotos?.productUrl) {
+      const link = document.createElement("a");
+      link.className = "result-link";
+      link.href = result.photo.googlePhotos.productUrl;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = "เปิด Google Photos";
+      card.querySelector(".result-meta").append(link);
+    }
+
     els.resultsGrid.append(card);
   }
 }
@@ -609,6 +625,20 @@ function createQueueItem(name, state) {
   status.textContent = state;
   row.append(title, status);
   return row;
+}
+
+function addGooglePhotosLink(queueItem, productUrl) {
+  if (!queueItem || !productUrl) {
+    return;
+  }
+
+  const link = document.createElement("a");
+  link.className = "queue-link";
+  link.href = productUrl;
+  link.target = "_blank";
+  link.rel = "noopener";
+  link.textContent = "เปิด Google Photos";
+  queueItem.append(link);
 }
 
 function formatGooglePhotosQueueNote(status) {
@@ -676,13 +706,22 @@ function exportResults() {
   }
 
   const rows = [
-    ["activity", "file_name", "distance", "confidence_percent", "image_url", "faces_in_photo"],
+    [
+      "activity",
+      "file_name",
+      "distance",
+      "confidence_percent",
+      "image_url",
+      "google_photo_url",
+      "faces_in_photo"
+    ],
     ...lastResults.map((result) => [
       result.photo.activityName || "",
       result.photo.name,
       result.distance.toFixed(4),
       Math.round(result.confidence * 100),
       new URL(result.photo.imageUrl, window.location.origin).href,
+      result.photo.googlePhotos?.productUrl || "",
       result.photo.facesCount || 0
     ])
   ];
