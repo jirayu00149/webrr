@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="หลังบ้านสำหรับสร้างโฟลเดอร์กิจกรรมและอัปโหลดรูปกิจกรรมโรงเรียน"
+    />
+    <title>Admin Upload | School Face Finder</title>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+    <link rel="preconnect" href="https://justadudewhohacks.github.io" />
+    <link rel="stylesheet" href="styles.css" />
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"
+    ></script>
+    <script defer src="app.js"></script>
+  </head>
+  <body data-page="admin">
+    <header class="site-header">
+      <div class="app-shell nav-bar admin-nav">
+        <a class="brand" href="admin.html" aria-label="School Face Finder Admin">
+          <span class="brand-mark">SF</span>
+          <span>
+            <strong>School Face Finder</strong>
+            <small>Admin upload</small>
+          </span>
+        </a>
+        <div class="model-state" id="modelState" role="status">
+          <span class="state-dot" aria-hidden="true"></span>
+          <span id="modelStateText">กำลังเตรียมโมเดล</span>
+        </div>
+        <button class="secondary-button small-button" id="logoutBtn" type="button">
+          ออกจากระบบ
+        </button>
+      </div>
+    </header>
+
+    <main class="app-shell page-layout admin-only-layout">
+      <section class="page-hero admin-upload-hero">
+        <div>
+          <p class="eyebrow">Admin only</p>
+          <h1>อัปโหลดรูปกิจกรรม</h1>
+          <p>
+            สร้างโฟลเดอร์กิจกรรม เลือกกิจกรรม แล้วอัปโหลดรูปเข้าโฟลเดอร์นั้น
+            รูปจะถูกเก็บฝั่ง server เพื่อให้หน้าค้นหาของผู้ใช้เห็นคลังเดียวกัน
+          </p>
+        </div>
+      </section>
+
+      <section class="notice">
+        <div>
+          <h2>ตรวจสิทธิ์ก่อนอัปโหลด</h2>
+          <p>ใช้เฉพาะรูปที่โรงเรียนได้รับอนุญาตให้จัดเก็บและค้นหาแล้วเท่านั้น</p>
+        </div>
+        <label class="consent">
+          <input id="consentCheck" type="checkbox" />
+          <span>ยืนยันว่ามีสิทธิ์ใช้รูปชุดนี้</span>
+        </label>
+      </section>
+
+      <section class="panel activity-panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Activity folders</p>
+            <h2>สร้างและเลือกโฟลเดอร์กิจกรรม</h2>
+          </div>
+        </div>
+
+        <form class="activity-form" id="activityForm">
+          <label for="activityName">ชื่อกิจกรรมใหม่</label>
+          <div class="inline-form">
+            <input
+              id="activityName"
+              type="text"
+              maxlength="120"
+              placeholder="เช่น กีฬาสี 2569, วันไหว้ครู, ทัศนศึกษา"
+            />
+            <button class="secondary-button" type="submit">สร้างโฟลเดอร์</button>
+          </div>
+        </form>
+
+        <label class="field-label" for="activitySelect">อัปโหลดรูปเข้าโฟลเดอร์</label>
+        <select id="activitySelect" class="select-input"></select>
+
+        <div class="activity-list" id="activityList" aria-live="polite"></div>
+      </section>
+
+      <section class="panel upload-panel admin-upload-panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Upload</p>
+            <h2>เพิ่มรูปลงคลัง public search</h2>
+          </div>
+        </div>
+
+        <label class="dropzone" for="galleryInput" id="galleryDropzone">
+          <input id="galleryInput" type="file" accept="image/*" multiple />
+          <span class="drop-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 16V4m0 0 4 4m-4-4-4 4M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2" />
+            </svg>
+          </span>
+          <strong>ลากรูปมาวาง หรือกดเพื่อเลือกไฟล์</strong>
+          <span>ระบบจะตรวจจับใบหน้าและส่งรูปพร้อมข้อมูลดัชนีไปเก็บใน server</span>
+        </label>
+
+        <div class="queue" id="queueList" aria-live="polite"></div>
+      </section>
+
+      <section class="panel status-card admin-status" aria-live="polite">
+        <p class="eyebrow">Status</p>
+        <h2>สถานะอัปโหลด</h2>
+        <p id="statusText">รอโหลดโมเดลตรวจจับใบหน้า</p>
+        <div class="sync-status">
+          <p class="eyebrow">Google Photos</p>
+          <p class="small-note" id="googlePhotosState">กำลังตรวจสถานะ Google Photos</p>
+          <div class="button-row">
+            <a
+              class="secondary-button small-button hidden"
+              id="googlePhotosConnectBtn"
+              href="/api/admin/google-photos/connect"
+            >
+              เชื่อมต่อ Google Photos
+            </a>
+            <button class="secondary-button small-button" id="googlePhotosSyncBtn" type="button" disabled>
+              ซิงก์รูปที่ค้าง
+            </button>
+          </div>
+        </div>
+        <p class="small-note">
+          ลิงก์สำหรับแจกให้ผู้ใช้: <a href="user.html">/user.html</a>
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

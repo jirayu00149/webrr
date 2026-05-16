@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin Login | School Face Finder</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script defer src="app.js"></script>
+  </head>
+  <body data-page="login">
+    <main class="login-shell app-shell">
+      <section class="panel login-card">
+        <span class="brand-mark">SF</span>
+        <h1>Admin upload</h1>
+        <p>เข้าสู่ระบบเพื่อสร้างกิจกรรม อัปโหลดรูป และซิงก์ไป Google Photos</p>
+
+        <form class="login-form" id="loginForm">
+          <label for="adminPassword">รหัสผ่านแอดมิน</label>
+          <input id="adminPassword" type="password" autocomplete="current-password" required />
+          <button class="primary-button" type="submit">เข้าสู่ระบบ</button>
+          <p class="form-error" id="loginError" role="alert"></p>
+        </form>
+      </section>
+    </main>
+  </body>
+</html>

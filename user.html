@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="ค้นหารูปกิจกรรมโรงเรียนจากรูปใบหน้าตัวอย่าง"
+    />
+    <title>ค้นหารูปกิจกรรม | School Face Finder</title>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+    <link rel="preconnect" href="https://justadudewhohacks.github.io" />
+    <link rel="stylesheet" href="styles.css" />
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"
+    ></script>
+    <script defer src="app.js"></script>
+  </head>
+  <body data-page="user">
+    <header class="site-header">
+      <div class="app-shell nav-bar public-nav">
+        <a class="brand" href="user.html" aria-label="School Face Finder">
+          <span class="brand-mark">SF</span>
+          <span>
+            <strong>School Face Finder</strong>
+            <small>ค้นหารูปกิจกรรมโรงเรียน</small>
+          </span>
+        </a>
+        <div class="model-state" id="modelState" role="status">
+          <span class="state-dot" aria-hidden="true"></span>
+          <span id="modelStateText">กำลังเตรียมโมเดล</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="app-shell page-layout">
+      <section class="page-hero user-hero">
+        <div>
+          <p class="eyebrow">Public search</p>
+          <h1>ค้นหารูปที่มีคุณอยู่ในกิจกรรมโรงเรียน</h1>
+          <p>
+            เลือกกิจกรรมหรือค้นหาทุกกิจกรรม แล้วอัปโหลดรูปหน้าชัดหนึ่งรูปเพื่อค้นหารูปที่คล้าย
+          </p>
+        </div>
+        <div class="stat-grid">
+          <div class="stat-card">
+            <span class="metric-label">รูปในขอบเขตที่เลือก</span>
+            <strong id="photoCount">0</strong>
+          </div>
+          <div class="stat-card">
+            <span class="metric-label">ผลค้นหาล่าสุด</span>
+            <strong id="matchCount">0</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="user-workbench">
+        <article class="panel search-panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Search</p>
+              <h2>เลือกรูปใบหน้าตัวอย่าง</h2>
+            </div>
+          </div>
+
+          <div class="reference-layout">
+            <label class="reference-picker" for="referenceInput">
+              <input id="referenceInput" type="file" accept="image/*" />
+              <img id="referencePreview" alt="" hidden />
+              <span id="referencePlaceholder">เลือกรูปหน้าชัด</span>
+            </label>
+
+            <div class="search-controls">
+              <label class="field-label" for="activityFilter">เลือกกิจกรรม</label>
+              <select id="activityFilter" class="select-input"></select>
+
+              <label class="consent compact-consent">
+                <input id="consentCheck" type="checkbox" />
+                <span>ยืนยันว่าค้นหารูปของตัวเอง หรือได้รับอนุญาตแล้ว</span>
+              </label>
+
+              <label class="range-row" for="thresholdInput">
+                <span>ความเข้มงวด</span>
+                <output id="thresholdValue" for="thresholdInput">0.52</output>
+              </label>
+              <input
+                id="thresholdInput"
+                type="range"
+                min="0.35"
+                max="0.65"
+                step="0.01"
+                value="0.52"
+              />
+              <button class="primary-button" id="searchBtn" type="button" disabled>
+                ค้นหารูปของฉัน
+              </button>
+            </div>
+          </div>
+        </article>
+
+        <aside class="panel status-card" aria-live="polite">
+          <p class="eyebrow">Status</p>
+          <h2>สถานะการค้นหา</h2>
+          <p id="statusText">รอโหลดโมเดลตรวจจับใบหน้า</p>
+          <button class="secondary-button" id="exportBtn" type="button" disabled>
+            ส่งออกผลลัพธ์ CSV
+          </button>
+        </aside>
+      </section>
+
+      <section class="results-section" aria-labelledby="resultsTitle">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Results</p>
+            <h2 id="resultsTitle">รูปที่น่าจะมีคุณอยู่ในภาพ</h2>
+          </div>
+        </div>
+        <div class="empty-state" id="emptyState">
+          <strong>ยังไม่มีผลค้นหา</strong>
+          <span>เลือกกิจกรรม เลือกรูปตัวอย่างใบหน้า แล้วกดค้นหาเพื่อดูผลลัพธ์</span>
+        </div>
+        <div class="results-grid" id="resultsGrid"></div>
+      </section>
+    </main>
+
+    <template id="resultCardTemplate">
+      <article class="result-card">
+        <div class="image-wrap">
+          <img alt="" />
+          <canvas aria-hidden="true"></canvas>
+        </div>
+        <div class="result-meta">
+          <strong></strong>
+          <span></span>
+        </div>
+      </article>
+    </template>
+  </body>
+</html>
