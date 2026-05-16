@@ -13,6 +13,9 @@ This project must run as a Render **Web Service**, not a Static Site. The browse
 4. Add an environment variable:
    - `ADMIN_PASSWORD`: your real admin password
    - Recommended, for automatic Google Drive sync:
+     - `GOOGLE_DRIVE_CLIENT_ID`
+     - `GOOGLE_DRIVE_CLIENT_SECRET`
+     - `GOOGLE_DRIVE_REFRESH_TOKEN` (added after OAuth connect, or set manually)
      - `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON`
      - `GOOGLE_DRIVE_FOLDER_ID`
    - Optional, for automatic Google Photos sync:
@@ -21,7 +24,7 @@ This project must run as a Render **Web Service**, not a Static Site. The browse
      - `GOOGLE_PHOTOS_REFRESH_TOKEN` (added after OAuth connect, or set manually)
      - `GOOGLE_PHOTOS_ALBUM_ID` (optional target album)
    You can also enter the Google Drive Service Account JSON and one main Folder ID from the admin page. The server stores them in `DATA_DIR/google-drive-config.json`.
-   Service Account uploads need a Google Workspace Shared Drive folder. Add the service account email as Content manager or Editor on that Shared Drive folder before syncing. A normal personal "My Drive" folder can return `HTTP 403: Service Accounts do not have storage quota`.
+   For personal Gmail, use Google Drive OAuth: enter the Drive Client ID, Client Secret, and one folder from the admin page, then click Connect Google Drive once. Service Account uploads need a Google Workspace Shared Drive folder. A normal personal "My Drive" folder can return `HTTP 403: Service Accounts do not have storage quota`.
    The app creates one subfolder per activity automatically, so you do not need to change the folder link for every event.
 5. Deploy, then open:
    - Public page: `https://YOUR-SERVICE.onrender.com/user.html`

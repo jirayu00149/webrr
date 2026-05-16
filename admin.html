@@ -178,14 +178,22 @@
           </div>
           <div class="google-config-form">
             <label>
-              Service Account JSON
-              <textarea
-                id="googleDriveServiceAccountInput"
-                rows="7"
-                spellcheck="false"
-                wrap="soft"
-                placeholder="Paste the full Service Account JSON here"
-              ></textarea>
+              Google Drive Client ID
+              <input
+                id="googleDriveClientIdInput"
+                type="text"
+                autocomplete="off"
+                placeholder="1234567890-xxxx.apps.googleusercontent.com"
+              />
+            </label>
+            <label>
+              Google Drive Client Secret
+              <input
+                id="googleDriveClientSecretInput"
+                type="password"
+                autocomplete="off"
+                placeholder="Leave blank if already saved"
+              />
             </label>
             <label>
               Main Google Drive Folder ID or URL
@@ -202,6 +210,13 @@
               </button>
               <a
                 class="secondary-button small-button hidden"
+                id="connectGoogleDriveBtn"
+                href="/api/admin/google-drive/connect"
+              >
+                Connect Google Drive
+              </a>
+              <a
+                class="secondary-button small-button hidden"
                 id="googleDriveFolderLink"
                 href="#"
                 target="_blank"
@@ -211,9 +226,8 @@
               </a>
             </div>
             <p class="small-note google-redirect-note">
-              Set one main folder only. The app creates subfolders by activity name.
-              For Service Account uploads, use a Google Workspace Shared Drive folder and add
-              the Service Account email as Content manager or Editor before syncing.
+              For personal Gmail, save the Client ID, Client Secret, and one Drive folder,
+              then connect Google Drive once. The app creates subfolders by activity name.
             </p>
           </div>
         </div>

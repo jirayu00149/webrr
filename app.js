@@ -48,8 +48,11 @@ const els = {
   googleDriveState: $("#googleDriveState"),
   googleDriveSyncBtn: $("#googleDriveSyncBtn"),
   googleDriveServiceAccountInput: $("#googleDriveServiceAccountInput"),
+  googleDriveClientIdInput: $("#googleDriveClientIdInput"),
+  googleDriveClientSecretInput: $("#googleDriveClientSecretInput"),
   googleDriveFolderIdInput: $("#googleDriveFolderIdInput"),
   googleDriveFolderLink: $("#googleDriveFolderLink"),
+  connectGoogleDriveBtn: $("#connectGoogleDriveBtn"),
   saveGoogleDriveConfigBtn: $("#saveGoogleDriveConfigBtn")
 };
 
@@ -407,7 +410,7 @@ function renderUserSaveLink() {
 }
 
 async function loadGoogleDriveConfig() {
-  if (!els.googleDriveServiceAccountInput) {
+  if (!els.googleDriveClientIdInput && !els.googleDriveServiceAccountInput) {
     return;
   }
 
@@ -422,6 +425,17 @@ async function loadGoogleDriveConfig() {
 }
 
 function renderGoogleDriveConfig(config) {
+  if (els.googleDriveClientIdInput) {
+    els.googleDriveClientIdInput.value = config.clientId || "";
+  }
+
+  if (els.googleDriveClientSecretInput) {
+    els.googleDriveClientSecretInput.value = "";
+    els.googleDriveClientSecretInput.placeholder = config.hasClientSecret
+      ? "Client secret saved. Leave blank to keep it."
+      : "Paste Google Drive client secret";
+  }
+
   if (els.googleDriveServiceAccountInput) {
     els.googleDriveServiceAccountInput.value = "";
     els.googleDriveServiceAccountInput.placeholder = config.hasServiceAccount
@@ -437,6 +451,13 @@ function renderGoogleDriveConfig(config) {
     els.googleDriveFolderLink.href = config.folderUrl || "#";
     els.googleDriveFolderLink.classList.toggle("hidden", !config.folderUrl);
   }
+
+  if (els.connectGoogleDriveBtn) {
+    els.connectGoogleDriveBtn.classList.toggle(
+      "hidden",
+      !config.clientId || !config.hasClientSecret || !config.folderId || config.connected
+    );
+  }
 }
 
 async function saveGoogleDriveConfig() {
@@ -445,6 +466,8 @@ async function saveGoogleDriveConfig() {
   }
 
   const payload = {
+    clientId: els.googleDriveClientIdInput?.value.trim() || "",
+    clientSecret: els.googleDriveClientSecretInput?.value.trim() || "",
     serviceAccountJson: els.googleDriveServiceAccountInput?.value.trim() || "",
     folderId: els.googleDriveFolderIdInput?.value.trim() || "",
     enabled: true

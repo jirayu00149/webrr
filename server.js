@@ -20,6 +20,7 @@ const googlePhotosRuntimeConfigFile = path.join(dataDir, "google-photos-config.j
 const googlePhotosTokenFile = path.join(dataDir, "google-photos-token.json");
 const googleDriveRuntimeConfigFile = path.join(dataDir, "google-drive-config.json");
 const googlePhotosOAuthStateCookie = "sff_google_photos_state";
+const googleDriveOAuthStateCookie = "sff_google_drive_state";
 const googlePhotosScope = "https://www.googleapis.com/auth/photoslibrary.appendonly";
 const googleDriveScope = "https://www.googleapis.com/auth/drive.file";
 const defaultActivity = {
@@ -31,7 +32,7 @@ const defaultActivity = {
 defaultActivity.name = "ทั่วไป";
 const sessions = new Set();
 let googlePhotosAccessTokenCache = { token: "", expiresAt: 0 };
-let googleDriveAccessTokenCache = { token: "", key: "", expiresAt: 0 };
+let googleDriveAccessTokenCache = { token: "", key: "", refreshToken: "", expiresAt: 0 };
 
 const contentTypes = {
   ".css": "text/css; charset=utf-8",
@@ -414,6 +415,21 @@ async function handleApi(request, response, url) {
       config: publicGoogleDriveConfig(),
       googleDrive: makeGoogleDriveSummary(photos)
     });
+    return;
+  }
+
+  if (url.pathname === "/api/admin/google-drive/connect" && request.method === "GET") {
+    if (!isAuthenticated(request)) {
+      redirect(response, "/admin.html");
+      return;
+    }
+
+    await redirectToGoogleDriveOAuth(request, response);
+    return;
+  }
+
+  if (url.pathname === "/api/google-drive/oauth/callback" && request.method === "GET") {
+    await handleGoogleDriveOAuthCallback(request, response, url);
     return;
   }
 
@@ -815,6 +831,22 @@ function boolFrom(value, fallback) {
 
 function getGoogleDriveConfig() {
   const runtimeConfig = readJsonFileSync(googleDriveRuntimeConfigFile);
+  const clientId =
+    process.env.GOOGLE_DRIVE_CLIENT_ID ||
+    process.env.GOOGLE_CLIENT_ID ||
+    runtimeConfig.clientId ||
+    "";
+  const clientSecret =
+    process.env.GOOGLE_DRIVE_CLIENT_SECRET ||
+    process.env.GOOGLE_CLIENT_SECRET ||
+    runtimeConfig.clientSecret ||
+    "";
+  const refreshToken =
+    process.env.GOOGLE_DRIVE_REFRESH_TOKEN ||
+    process.env.GOOGLE_REFRESH_TOKEN ||
+    runtimeConfig.refreshToken ||
+    runtimeConfig.refresh_token ||
+    "";
   const serviceAccount = parseServiceAccount(
     process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON ||
       process.env.GOOGLE_SERVICE_ACCOUNT_JSON ||
@@ -830,15 +862,21 @@ function getGoogleDriveConfig() {
   );
   const enabled = boolFrom(
     process.env.GOOGLE_DRIVE_ENABLED ?? runtimeConfig.enabled,
-    Boolean(serviceAccount && folderId)
+    Boolean(folderId && ((clientId && clientSecret && refreshToken) || serviceAccount))
   );
 
   return {
     enabled,
+    clientId,
+    clientSecret,
+    refreshToken,
     serviceAccount,
     folderId,
     folderUrl: folderId ? `https://drive.google.com/drive/folders/${folderId}` : "",
-    configured: Boolean(serviceAccount && folderId)
+    oauthConfigured: Boolean(clientId && clientSecret),
+    connected: Boolean(refreshToken),
+    authMode: refreshToken ? "oauth" : clientId && clientSecret ? "oauth_pending" : serviceAccount ? "service_account" : "none",
+    configured: Boolean(folderId && ((clientId && clientSecret && refreshToken) || (!clientId && !clientSecret && serviceAccount)))
   };
 }
 
@@ -863,11 +901,18 @@ function publicGoogleDriveConfig() {
   const config = getGoogleDriveConfig();
   return {
     enabled: config.enabled,
+    clientId: config.clientId || "",
+    hasClientSecret: Boolean(config.clientSecret),
+    connected: config.connected,
+    authMode: config.authMode,
     folderId: config.folderId,
     folderUrl: config.folderUrl,
     hasServiceAccount: Boolean(config.serviceAccount),
     serviceAccountEmail: config.serviceAccount?.client_email || "",
     usingEnv:
+      Boolean(process.env.GOOGLE_DRIVE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID) ||
+      Boolean(process.env.GOOGLE_DRIVE_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET) ||
+      Boolean(process.env.GOOGLE_DRIVE_REFRESH_TOKEN || process.env.GOOGLE_REFRESH_TOKEN) ||
       Boolean(process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON || process.env.GOOGLE_SERVICE_ACCOUNT_JSON) ||
       Boolean(process.env.GOOGLE_DRIVE_FOLDER_ID)
   };
@@ -883,6 +928,17 @@ async function updateGoogleDriveRuntimeConfig(body) {
     next.folderId = extractGoogleDriveFolderId(body.folderId);
   }
 
+  if (Object.prototype.hasOwnProperty.call(body, "clientId")) {
+    next.clientId = sanitizeConfigValue(body.clientId);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, "clientSecret")) {
+    const clientSecret = sanitizeConfigValue(body.clientSecret);
+    if (clientSecret) {
+      next.clientSecret = clientSecret;
+    }
+  }
+
   if (Object.prototype.hasOwnProperty.call(body, "serviceAccountJson")) {
     const serviceAccountJson = String(body.serviceAccountJson || "").trim();
     if (serviceAccountJson) {
@@ -893,6 +949,20 @@ async function updateGoogleDriveRuntimeConfig(body) {
       next.serviceAccount = serviceAccount;
       delete next.serviceAccountJson;
     }
+  }
+
+  if (next.clientId && next.clientSecret) {
+    if (!next.folderId) {
+      return { ok: false, error: "Please enter a Google Drive Folder ID or URL." };
+    }
+
+    await fsp.mkdir(dataDir, { recursive: true });
+    await fsp.writeFile(
+      googleDriveRuntimeConfigFile,
+      `${JSON.stringify(next, null, 2)}\n`,
+      "utf8"
+    );
+    return { ok: true };
   }
 
   if (!next.serviceAccount?.client_email || !next.serviceAccount?.private_key) {
@@ -938,8 +1008,10 @@ function makeGoogleDriveSummary(photos) {
   const config = getGoogleDriveConfig();
   let state = "ready";
 
-  if (!config.configured) {
+  if (!config.folderId || (!config.oauthConfigured && !config.serviceAccount)) {
     state = "not_configured";
+  } else if (config.oauthConfigured && !config.connected) {
+    state = "not_connected";
   } else if (!config.enabled) {
     state = "disabled";
   }
@@ -954,6 +1026,9 @@ function makeGoogleDriveSummary(photos) {
     configured: config.configured,
     folderId: config.folderId,
     folderUrl: config.folderUrl,
+    connected: config.connected,
+    oauthConfigured: config.oauthConfigured,
+    authMode: config.authMode,
     serviceAccountEmail: config.serviceAccount?.client_email || "",
     total: photos.length,
     saved,
@@ -1095,6 +1170,17 @@ async function syncGoogleDriveBacklog() {
 }
 
 async function getGoogleDriveAccessToken(config) {
+  if (config.oauthConfigured) {
+    if (config.refreshToken) {
+      return getGoogleDriveOAuthAccessToken(config);
+    }
+    throw new Error("Google Drive is not connected.");
+  }
+
+  if (!config.serviceAccount) {
+    throw new Error("Google Drive is not connected.");
+  }
+
   const cacheKey = `${config.serviceAccount.client_email}:${config.folderId}`;
   if (
     googleDriveAccessTokenCache.token &&
@@ -1129,6 +1215,43 @@ async function getGoogleDriveAccessToken(config) {
   googleDriveAccessTokenCache = {
     token: token.access_token,
     key: cacheKey,
+    expiresAt: Date.now() + Number(token.expires_in || 3600) * 1000
+  };
+  return token.access_token;
+}
+
+async function getGoogleDriveOAuthAccessToken(config) {
+  if (
+    googleDriveAccessTokenCache.token &&
+    googleDriveAccessTokenCache.refreshToken === config.refreshToken &&
+    googleDriveAccessTokenCache.expiresAt > Date.now() + 60 * 1000
+  ) {
+    return googleDriveAccessTokenCache.token;
+  }
+
+  const body = new URLSearchParams({
+    client_id: config.clientId,
+    client_secret: config.clientSecret,
+    refresh_token: config.refreshToken,
+    grant_type: "refresh_token"
+  }).toString();
+
+  const token = await requestJson("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Content-Length": Buffer.byteLength(body)
+    }
+  }, body);
+
+  if (!token.access_token) {
+    throw new Error("Google did not return a Drive access token.");
+  }
+
+  googleDriveAccessTokenCache = {
+    token: token.access_token,
+    key: `oauth:${config.folderId}`,
+    refreshToken: config.refreshToken,
     expiresAt: Date.now() + Number(token.expires_in || 3600) * 1000
   };
   return token.access_token;
@@ -1515,6 +1638,137 @@ async function redirectToGooglePhotosOAuth(request, response) {
     })
   });
   response.end();
+}
+
+async function redirectToGoogleDriveOAuth(request, response) {
+  const config = getGoogleDriveConfig();
+
+  if (!config.oauthConfigured) {
+    sendHtml(
+      response,
+      400,
+      makeGooglePhotosMessagePage(
+        "Google Drive setup",
+        "Missing GOOGLE_DRIVE_CLIENT_ID and GOOGLE_DRIVE_CLIENT_SECRET."
+      )
+    );
+    return;
+  }
+
+  const state = crypto.randomBytes(24).toString("hex");
+  const redirectUri = `${getOrigin(request)}/api/google-drive/oauth/callback`;
+  const params = new URLSearchParams({
+    client_id: config.clientId,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: googleDriveScope,
+    access_type: "offline",
+    prompt: "consent",
+    include_granted_scopes: "true",
+    state
+  });
+
+  response.writeHead(302, {
+    Location: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`,
+    "Set-Cookie": cookie(googleDriveOAuthStateCookie, state, {
+      httpOnly: true,
+      sameSite: "Lax",
+      maxAge: 600
+    })
+  });
+  response.end();
+}
+
+async function handleGoogleDriveOAuthCallback(request, response, url) {
+  const expectedState = getCookie(request, googleDriveOAuthStateCookie);
+  const actualState = url.searchParams.get("state");
+  const clearStateCookie = cookie(googleDriveOAuthStateCookie, "", {
+    httpOnly: true,
+    sameSite: "Lax",
+    maxAge: 0
+  });
+
+  try {
+    if (!expectedState || expectedState !== actualState) {
+      throw new Error("OAuth state did not match. Please start the connection again.");
+    }
+
+    const oauthError = url.searchParams.get("error");
+    if (oauthError) {
+      throw new Error(`Google rejected the connection: ${oauthError}`);
+    }
+
+    const code = url.searchParams.get("code");
+    if (!code) {
+      throw new Error("Google did not return an authorization code.");
+    }
+
+    const config = getGoogleDriveConfig();
+    if (!config.oauthConfigured) {
+      throw new Error("Missing Google Drive OAuth client settings.");
+    }
+
+    const redirectUri = `${getOrigin(request)}/api/google-drive/oauth/callback`;
+    const token = await exchangeGoogleDriveCode(config, code, redirectUri);
+    const refreshToken = token.refresh_token || config.refreshToken;
+
+    if (!refreshToken) {
+      throw new Error("Google did not return a refresh token. Try connecting again.");
+    }
+
+    await saveGoogleDriveRefreshToken(refreshToken);
+
+    if (token.access_token) {
+      googleDriveAccessTokenCache = {
+        token: token.access_token,
+        key: `oauth:${config.folderId}`,
+        refreshToken,
+        expiresAt: Date.now() + Number(token.expires_in || 3600) * 1000
+      };
+    }
+
+    sendHtml(
+      response,
+      200,
+      makeGooglePhotosMessagePage(
+        "Google Drive connected",
+        "You can close this page and return to the admin upload screen."
+      ),
+      { "Set-Cookie": clearStateCookie }
+    );
+  } catch (error) {
+    sendHtml(
+      response,
+      400,
+      makeGooglePhotosMessagePage("Google Drive connection failed", error.message),
+      { "Set-Cookie": clearStateCookie }
+    );
+  }
+}
+
+async function exchangeGoogleDriveCode(config, code, redirectUri) {
+  const body = new URLSearchParams({
+    code,
+    client_id: config.clientId,
+    client_secret: config.clientSecret,
+    redirect_uri: redirectUri,
+    grant_type: "authorization_code"
+  }).toString();
+
+  return requestJson("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Content-Length": Buffer.byteLength(body)
+    }
+  }, body);
+}
+
+async function saveGoogleDriveRefreshToken(refreshToken) {
+  const next = readJsonFileSync(googleDriveRuntimeConfigFile);
+  next.refreshToken = refreshToken;
+  await fsp.mkdir(dataDir, { recursive: true });
+  await fsp.writeFile(googleDriveRuntimeConfigFile, `${JSON.stringify(next, null, 2)}\n`, "utf8");
 }
 
 async function handleGooglePhotosOAuthCallback(request, response, url) {
