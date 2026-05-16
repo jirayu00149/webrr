@@ -14,6 +14,7 @@ const dataDir = process.env.DATA_DIR
 const uploadDir = path.join(dataDir, "uploads");
 const photosFile = path.join(dataDir, "photos.json");
 const activitiesFile = path.join(dataDir, "activities.json");
+const shareFile = path.join(dataDir, "share.json");
 const googlePhotosConfigFile = path.join(root, "googlePhotosConfig.json");
 const googlePhotosTokenFile = path.join(dataDir, "google-photos-token.json");
 const googlePhotosOAuthStateCookie = "sff_google_photos_state";
@@ -54,6 +55,11 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
+    if (url.pathname.startsWith("/s/")) {
+      await serveSharedUserPage(response, url.pathname);
+      return;
+    }
+
     if (url.pathname.startsWith("/api/")) {
       await handleApi(request, response, url);
       return;
@@ -88,6 +94,10 @@ function ensureDataFiles() {
 
   if (!fs.existsSync(activitiesFile)) {
     fs.writeFileSync(activitiesFile, `${JSON.stringify([defaultActivity], null, 2)}\n`, "utf8");
+  }
+
+  if (!fs.existsSync(shareFile)) {
+    fs.writeFileSync(shareFile, `${JSON.stringify(makeShareState(), null, 2)}\n`, "utf8");
   }
 
   if (!fs.existsSync(photosFile)) {
@@ -237,6 +247,88 @@ async function handleApi(request, response, url) {
     return;
   }
 
+  if (url.pathname === "/api/admin/photos" && request.method === "GET") {
+    if (!isAuthenticated(request)) {
+      sendJson(response, 401, { error: "Admin login required" });
+      return;
+    }
+
+    const activityId = url.searchParams.get("activityId") || "";
+    const photos = await readPhotos();
+    const filteredPhotos = activityId
+      ? photos.filter((photo) => photo.activityId === activityId)
+      : photos;
+    sendJson(response, 200, {
+      photos: filteredPhotos
+        .slice()
+        .sort((left, right) => Number(right.createdAt || 0) - Number(left.createdAt || 0))
+        .map(adminPhoto),
+      stats: makeStats(filteredPhotos)
+    });
+    return;
+  }
+
+  const adminPhotoMatch = url.pathname.match(/^\/api\/admin\/photos\/([^/]+)$/);
+  if (adminPhotoMatch && request.method === "PATCH") {
+    if (!isAuthenticated(request)) {
+      sendJson(response, 401, { error: "Admin login required" });
+      return;
+    }
+
+    const body = await readJsonBody(request, 64 * 1024);
+    const result = await updateManualPhotoLink(
+      adminPhotoMatch[1],
+      body.googlePhotoUrl || body.productUrl || ""
+    );
+    sendJson(response, result.ok ? 200 : 404, result);
+    return;
+  }
+
+  if (adminPhotoMatch && request.method === "DELETE") {
+    if (!isAuthenticated(request)) {
+      sendJson(response, 401, { error: "Admin login required" });
+      return;
+    }
+
+    const result = await deletePhoto(adminPhotoMatch[1]);
+    sendJson(response, result.ok ? 200 : 404, result);
+    return;
+  }
+
+  const adminActivityMatch = url.pathname.match(/^\/api\/admin\/activities\/([^/]+)$/);
+  if (adminActivityMatch && request.method === "DELETE") {
+    if (!isAuthenticated(request)) {
+      sendJson(response, 401, { error: "Admin login required" });
+      return;
+    }
+
+    const result = await deleteActivity(adminActivityMatch[1]);
+    sendJson(response, result.ok ? 200 : 400, result);
+    return;
+  }
+
+  if (url.pathname === "/api/admin/share-link" && request.method === "GET") {
+    if (!isAuthenticated(request)) {
+      sendJson(response, 401, { error: "Admin login required" });
+      return;
+    }
+
+    sendJson(response, 200, await makeShareLinkPayload(request));
+    return;
+  }
+
+  if (url.pathname === "/api/admin/share-link/regenerate" && request.method === "POST") {
+    if (!isAuthenticated(request)) {
+      sendJson(response, 401, { error: "Admin login required" });
+      return;
+    }
+
+    const shareState = makeShareState();
+    await writeShareState(shareState);
+    sendJson(response, 200, await makeShareLinkPayload(request, shareState));
+    return;
+  }
+
   if (url.pathname === "/api/admin/google-photos" && request.method === "GET") {
     if (!isAuthenticated(request)) {
       sendJson(response, 401, { error: "Admin login required" });
@@ -332,14 +424,136 @@ async function saveUploadedPhoto(body, activity) {
     faces: body.faces.map(normalizeFace).filter(Boolean)
   };
 
-  record.googlePhotos = await mirrorPhotoToGooglePhotos(record, imageBuffer, {
-    fileName,
-    mimeType
-  });
+  const manualGooglePhotoUrl = sanitizeOptionalUrl(body.googlePhotoUrl || body.productUrl || "");
+  record.googlePhotos = manualGooglePhotoUrl
+    ? makeManualGooglePhoto(manualGooglePhotoUrl)
+    : await mirrorPhotoToGooglePhotos(record, imageBuffer, {
+        fileName,
+        mimeType
+      });
 
   photos.push(record);
   await writePhotos(photos);
   return record;
+}
+
+async function updateManualPhotoLink(photoId, urlValue) {
+  const photos = await readPhotos();
+  const photo = photos.find((item) => item.id === photoId);
+
+  if (!photo) {
+    return { ok: false, error: "Photo not found" };
+  }
+
+  const productUrl = sanitizeOptionalUrl(urlValue);
+  if (String(urlValue || "").trim() && !productUrl) {
+    return { ok: false, error: "Only http or https links are allowed" };
+  }
+
+  photo.googlePhotos = productUrl
+    ? makeManualGooglePhoto(productUrl)
+    : {
+        status: "unsynced",
+        productUrl: "",
+        updatedAt: Date.now()
+      };
+
+  await writePhotos(photos);
+  return { ok: true, photo: adminPhoto(photo) };
+}
+
+async function deletePhoto(photoId) {
+  const photos = await readPhotos();
+  const index = photos.findIndex((photo) => photo.id === photoId);
+
+  if (index === -1) {
+    return { ok: false, error: "Photo not found" };
+  }
+
+  const [photo] = photos.splice(index, 1);
+  await removePhotoFile(photo);
+  await writePhotos(photos);
+  return {
+    ok: true,
+    id: photoId,
+    stats: makeStats(photos)
+  };
+}
+
+async function deleteActivity(activityId) {
+  const activities = await readActivities();
+  const activity = activities.find((item) => item.id === activityId);
+
+  if (!activity) {
+    return { ok: false, error: "Activity not found" };
+  }
+
+  if (activity.id === defaultActivity.id) {
+    return { ok: false, error: "Default activity cannot be deleted" };
+  }
+
+  const photos = await readPhotos();
+  const keptPhotos = [];
+  const removedPhotos = [];
+
+  for (const photo of photos) {
+    if (photo.activityId === activity.id) {
+      removedPhotos.push(photo);
+    } else {
+      keptPhotos.push(photo);
+    }
+  }
+
+  for (const photo of removedPhotos) {
+    await removePhotoFile(photo);
+  }
+
+  const activityDir = path.resolve(uploadDir, activity.slug);
+  if (isPathInside(uploadDir, activityDir)) {
+    await fsp.rm(activityDir, { recursive: true, force: true });
+  }
+
+  await writePhotos(keptPhotos);
+  await writeActivities(activities.filter((item) => item.id !== activity.id));
+
+  return {
+    ok: true,
+    id: activity.id,
+    deletedPhotos: removedPhotos.length,
+    activities: addActivityCounts(await readActivities(), keptPhotos),
+    stats: makeStats(keptPhotos)
+  };
+}
+
+async function removePhotoFile(photo) {
+  const filePath = getLocalPhotoPath(photo);
+  if (filePath) {
+    await fsp.unlink(filePath).catch(() => {});
+  }
+}
+
+function makeManualGooglePhoto(productUrl) {
+  return {
+    status: "manual",
+    mediaItemId: "",
+    productUrl,
+    syncedAt: 0,
+    updatedAt: Date.now()
+  };
+}
+
+function sanitizeOptionalUrl(value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return "";
+  }
+
+  try {
+    const url = new URL(text);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : "";
+  } catch {
+    return "";
+  }
 }
 
 function normalizeFace(face) {
@@ -439,9 +653,13 @@ function makeGooglePhotosSummary(photos) {
     state = "not_connected";
   }
 
-  const saved = photos.filter((photo) => photo.googlePhotos?.status === "saved").length;
+  const saved = photos.filter((photo) =>
+    ["saved", "manual"].includes(photo.googlePhotos?.status)
+  ).length;
   const failed = photos.filter((photo) => photo.googlePhotos?.status === "failed").length;
-  const unsynced = photos.filter((photo) => photo.googlePhotos?.status !== "saved").length;
+  const unsynced = photos.filter(
+    (photo) => !["saved", "manual"].includes(photo.googlePhotos?.status)
+  ).length;
 
   return {
     state,
@@ -542,7 +760,7 @@ async function syncGooglePhotosBacklog() {
   let skipped = 0;
 
   for (const photo of photos) {
-    if (photo.googlePhotos?.status === "saved") {
+    if (["saved", "manual"].includes(photo.googlePhotos?.status)) {
       skipped += 1;
       continue;
     }
@@ -969,6 +1187,41 @@ function htmlEscape(value) {
     .replaceAll("'", "&#039;");
 }
 
+function makeShareState() {
+  return {
+    token: crypto.randomBytes(12).toString("hex"),
+    createdAt: Date.now()
+  };
+}
+
+async function readShareState() {
+  try {
+    const state = JSON.parse(await fsp.readFile(shareFile, "utf8"));
+    if (state?.token) {
+      return state;
+    }
+  } catch {}
+
+  const state = makeShareState();
+  await writeShareState(state);
+  return state;
+}
+
+async function writeShareState(state) {
+  await fsp.writeFile(shareFile, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+}
+
+async function makeShareLinkPayload(request, state = null) {
+  const shareState = state || await readShareState();
+  const pathName = `/s/${shareState.token}`;
+  return {
+    token: shareState.token,
+    path: pathName,
+    url: `${getOrigin(request)}${pathName}`,
+    createdAt: shareState.createdAt || 0
+  };
+}
+
 async function readActivities() {
   try {
     const activities = JSON.parse(await fsp.readFile(activitiesFile, "utf8"));
@@ -1078,6 +1331,19 @@ function makeStats(photos) {
     photos: photos.length,
     faces: photos.reduce((total, photo) => total + photo.faces.length, 0)
   };
+}
+
+async function serveSharedUserPage(response, pathname) {
+  const token = pathname.replace(/^\/s\/+/, "").split("/")[0];
+  const shareState = await readShareState();
+
+  if (!token || token !== shareState.token) {
+    response.writeHead(404);
+    response.end("Not found");
+    return;
+  }
+
+  await serveStatic(response, "user.html");
 }
 
 async function serveUpload(response, pathname) {

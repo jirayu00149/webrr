@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="หลังบ้านสำหรับสร้างโฟลเดอร์กิจกรรมและอัปโหลดรูปกิจกรรมโรงเรียน"
+      content="หลังบ้านสำหรับสร้างโฟลเดอร์กิจกรรม อัปโหลดรูป และจัดการลิงก์รูปกิจกรรม"
     />
     <title>Admin Upload | School Face Finder</title>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" />
@@ -44,7 +44,7 @@
           <h1>อัปโหลดรูปกิจกรรม</h1>
           <p>
             สร้างโฟลเดอร์กิจกรรม เลือกกิจกรรม แล้วอัปโหลดรูปเข้าโฟลเดอร์นั้น
-            รูปจะถูกเก็บฝั่ง server เพื่อให้หน้าค้นหาของผู้ใช้เห็นคลังเดียวกัน
+            แอดมินสามารถใส่ลิงก์ Google Photos เอง ลบรูป และลบโฟลเดอร์ได้จากหน้านี้
           </p>
         </div>
       </section>
@@ -54,10 +54,6 @@
           <h2>ตรวจสิทธิ์ก่อนอัปโหลด</h2>
           <p>ใช้เฉพาะรูปที่โรงเรียนได้รับอนุญาตให้จัดเก็บและค้นหาแล้วเท่านั้น</p>
         </div>
-        <label class="consent">
-          <input id="consentCheck" type="checkbox" />
-          <span>ยืนยันว่ามีสิทธิ์ใช้รูปชุดนี้</span>
-        </label>
       </section>
 
       <section class="panel activity-panel">
@@ -81,8 +77,13 @@
           </div>
         </form>
 
-        <label class="field-label" for="activitySelect">อัปโหลดรูปเข้าโฟลเดอร์</label>
-        <select id="activitySelect" class="select-input"></select>
+        <label class="field-label" for="activitySelect">อัปโหลดและจัดการรูปในโฟลเดอร์</label>
+        <div class="inline-form">
+          <select id="activitySelect" class="select-input"></select>
+          <button class="ghost-button" id="deleteActivityBtn" type="button" disabled>
+            ลบโฟลเดอร์
+          </button>
+        </div>
 
         <div class="activity-list" id="activityList" aria-live="polite"></div>
       </section>
@@ -103,7 +104,7 @@
             </svg>
           </span>
           <strong>ลากรูปมาวาง หรือกดเพื่อเลือกไฟล์</strong>
-          <span>ระบบจะตรวจจับใบหน้าและส่งรูปพร้อมข้อมูลดัชนีไปเก็บใน server</span>
+          <span>ระบบจะตรวจจับใบหน้าและบันทึกรูปลง server โดยแอดมินไม่ต้องติ๊กยืนยันซ้ำ</span>
         </label>
 
         <div class="upload-actions">
@@ -113,6 +114,20 @@
         </div>
 
         <div class="queue" id="queueList" aria-live="polite"></div>
+      </section>
+
+      <section class="panel admin-library-panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Photo management</p>
+            <h2>จัดการรูปและลิงก์ที่แอดมินใส่เอง</h2>
+          </div>
+        </div>
+        <div class="empty-state" id="adminPhotoEmpty">
+          <strong>ยังไม่มีรูปในโฟลเดอร์นี้</strong>
+          <span>อัปโหลดรูปก่อน แล้วระบบจะแสดงช่องใส่ลิงก์และปุ่มลบที่นี่</span>
+        </div>
+        <div class="admin-photo-grid" id="adminPhotoGrid"></div>
       </section>
 
       <section class="panel status-card admin-status" aria-live="polite">
@@ -135,9 +150,17 @@
             </button>
           </div>
         </div>
+      </section>
+
+      <section class="panel status-card admin-status">
+        <p class="eyebrow">Share link</p>
+        <h2>ลิงก์สุ่มสำหรับแจก</h2>
         <p class="small-note">
-          ลิงก์สำหรับแจกให้ผู้ใช้: <a href="user.html">/user.html</a>
+          <a id="shareLink" href="user.html">กำลังสร้างลิงก์สุ่ม</a>
         </p>
+        <button class="secondary-button small-button" id="regenerateShareLinkBtn" type="button">
+          สุ่มลิงก์ใหม่
+        </button>
       </section>
     </main>
   </body>

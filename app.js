@@ -32,8 +32,13 @@ const els = {
   activityForm: $("#activityForm"),
   activityName: $("#activityName"),
   activitySelect: $("#activitySelect"),
+  deleteActivityBtn: $("#deleteActivityBtn"),
   activityFilter: $("#activityFilter"),
   activityList: $("#activityList"),
+  adminPhotoGrid: $("#adminPhotoGrid"),
+  adminPhotoEmpty: $("#adminPhotoEmpty"),
+  shareLink: $("#shareLink"),
+  regenerateShareLinkBtn: $("#regenerateShareLinkBtn"),
   googlePhotosState: $("#googlePhotosState"),
   googlePhotosConnectBtn: $("#googlePhotosConnectBtn"),
   googlePhotosSyncBtn: $("#googlePhotosSyncBtn")
@@ -46,6 +51,7 @@ let activities = [];
 let overallStats = { photos: 0, faces: 0 };
 let currentStats = { photos: 0, faces: 0 };
 let googlePhotosStatus = null;
+let adminPhotos = [];
 
 document.addEventListener("DOMContentLoaded", init);
 
@@ -60,7 +66,9 @@ async function init() {
   try {
     await loadActivityIndex();
     if (page === "admin") {
+      await loadShareLink();
       await loadGooglePhotosStatus();
+      await loadAdminPhotos();
     }
 
     if (page === "admin" || page === "user") {
@@ -83,6 +91,13 @@ function bindEvents() {
   els.loginForm?.addEventListener("submit", handleLogin);
   els.logoutBtn?.addEventListener("click", handleLogout);
   els.activityForm?.addEventListener("submit", handleCreateActivity);
+  els.deleteActivityBtn?.addEventListener("click", deleteSelectedActivity);
+  els.regenerateShareLinkBtn?.addEventListener("click", regenerateShareLink);
+
+  els.activitySelect?.addEventListener("change", () => {
+    updateDeleteActivityButton();
+    loadAdminPhotos();
+  });
 
   els.activityFilter?.addEventListener("change", () => {
     updateSelectedStats();
@@ -184,6 +199,7 @@ async function handleCreateActivity(event) {
     if (body.activity?.id && els.activitySelect) {
       els.activitySelect.value = body.activity.id;
     }
+    await loadAdminPhotos();
     setStatus(`สร้างโฟลเดอร์กิจกรรม “${name}” แล้ว พร้อมอัปโหลดรูป`);
   } catch (error) {
     if (error.message === "UNAUTHORIZED") {
@@ -226,6 +242,54 @@ async function loadActivityIndex() {
   overallStats = body.stats || { photos: 0, faces: 0 };
   renderActivityControls();
   updateSelectedStats();
+}
+
+async function loadShareLink() {
+  if (!els.shareLink) {
+    return;
+  }
+
+  try {
+    const body = await apiGet("/api/admin/share-link");
+    renderShareLink(body);
+  } catch (error) {
+    if (error.message === "UNAUTHORIZED") {
+      window.location.href = "/admin.html";
+      return;
+    }
+    els.shareLink.textContent = "สร้างลิงก์แจกไม่สำเร็จ";
+    els.shareLink.removeAttribute("href");
+  }
+}
+
+async function regenerateShareLink() {
+  if (!els.regenerateShareLinkBtn) {
+    return;
+  }
+
+  els.regenerateShareLinkBtn.disabled = true;
+  try {
+    const body = await apiPost("/api/admin/share-link/regenerate", {});
+    renderShareLink(body);
+    setStatus("สร้างลิงก์แจกแบบสุ่มใหม่แล้ว");
+  } catch (error) {
+    if (error.message === "UNAUTHORIZED") {
+      window.location.href = "/admin.html";
+      return;
+    }
+    setStatus(error.message || "สร้างลิงก์แจกใหม่ไม่สำเร็จ");
+  } finally {
+    els.regenerateShareLinkBtn.disabled = false;
+  }
+}
+
+function renderShareLink(body) {
+  if (!els.shareLink) {
+    return;
+  }
+
+  els.shareLink.href = body.url || body.path || "user.html";
+  els.shareLink.textContent = body.path || body.url || "/user.html";
 }
 
 async function loadGooglePhotosStatus() {
@@ -309,6 +373,180 @@ async function syncGooglePhotosBacklog() {
   }
 }
 
+async function loadAdminPhotos() {
+  if (!els.adminPhotoGrid) {
+    return;
+  }
+
+  const activityId = els.activitySelect?.value || "";
+  const query = activityId ? `?activityId=${encodeURIComponent(activityId)}` : "";
+
+  try {
+    const body = await apiGet(`/api/admin/photos${query}`);
+    adminPhotos = Array.isArray(body.photos) ? body.photos : [];
+    renderAdminPhotos();
+  } catch (error) {
+    if (error.message === "UNAUTHORIZED") {
+      window.location.href = "/admin.html";
+      return;
+    }
+    adminPhotos = [];
+    renderAdminPhotos();
+    setStatus(error.message || "โหลดรายการรูปไม่สำเร็จ");
+  }
+}
+
+function renderAdminPhotos() {
+  if (!els.adminPhotoGrid) {
+    return;
+  }
+
+  els.adminPhotoGrid.innerHTML = "";
+  els.adminPhotoEmpty?.classList.toggle("hidden", adminPhotos.length > 0);
+
+  for (const photo of adminPhotos) {
+    els.adminPhotoGrid.append(createAdminPhotoCard(photo));
+  }
+}
+
+function createAdminPhotoCard(photo) {
+  const card = document.createElement("article");
+  const media = document.createElement("div");
+  const image = document.createElement("img");
+  const saveButton = document.createElement("button");
+  const body = document.createElement("div");
+  const title = document.createElement("strong");
+  const meta = document.createElement("span");
+  const label = document.createElement("label");
+  const input = document.createElement("input");
+  const actions = document.createElement("div");
+  const openLink = document.createElement("a");
+  const deleteButton = document.createElement("button");
+
+  card.className = "admin-photo-card";
+  media.className = "admin-photo-media";
+  body.className = "admin-photo-body";
+  actions.className = "admin-photo-actions";
+  saveButton.className = "secondary-button small-button photo-save-button";
+  deleteButton.className = "ghost-button";
+
+  image.src = photo.imageUrl;
+  image.alt = photo.name;
+  title.textContent = photo.name;
+  meta.textContent = `${photo.activityName || "กิจกรรม"} · ${photo.facesCount || 0} ใบหน้า`;
+  saveButton.type = "button";
+  saveButton.textContent = "บันทึก";
+  label.textContent = "ลิงก์ Google Photos";
+  input.type = "url";
+  input.placeholder = "วางลิงก์ Google Photos หรือ Drive ได้ที่นี่";
+  input.value = photo.googlePhotos?.productUrl || "";
+  deleteButton.type = "button";
+  deleteButton.textContent = "ลบรูป";
+
+  openLink.className = "admin-photo-link";
+  openLink.target = "_blank";
+  openLink.rel = "noopener";
+  openLink.textContent = "เปิดลิงก์";
+  if (photo.googlePhotos?.productUrl) {
+    openLink.href = photo.googlePhotos.productUrl;
+  } else {
+    openLink.classList.add("hidden");
+  }
+
+  saveButton.addEventListener("click", () => saveManualPhotoLink(photo.id, input.value, saveButton));
+  deleteButton.addEventListener("click", () => deleteAdminPhoto(photo));
+
+  media.append(image, saveButton);
+  label.append(input);
+  actions.append(openLink, deleteButton);
+  body.append(title, meta, label, actions);
+  card.append(media, body);
+  return card;
+}
+
+async function saveManualPhotoLink(photoId, value, button) {
+  const originalText = button?.textContent || "";
+  if (button) {
+    button.disabled = true;
+    button.textContent = "กำลังบันทึก";
+  }
+
+  try {
+    await apiPatch(`/api/admin/photos/${encodeURIComponent(photoId)}`, {
+      googlePhotoUrl: value
+    });
+    await loadAdminPhotos();
+    setStatus("บันทึกลิงก์รูปแล้ว");
+  } catch (error) {
+    if (error.message === "UNAUTHORIZED") {
+      window.location.href = "/admin.html";
+      return;
+    }
+    setStatus(error.message || "บันทึกลิงก์รูปไม่สำเร็จ");
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalText || "บันทึก";
+    }
+  }
+}
+
+async function deleteAdminPhoto(photo) {
+  if (!window.confirm(`ลบรูป "${photo.name}" ออกจากเว็บ?`)) {
+    return;
+  }
+
+  try {
+    await apiDelete(`/api/admin/photos/${encodeURIComponent(photo.id)}`);
+    await loadActivityIndex();
+    if (els.activitySelect) {
+      els.activitySelect.value = photo.activityId;
+    }
+    await loadAdminPhotos();
+    await loadGooglePhotosStatus();
+    setStatus("ลบรูปแล้ว");
+  } catch (error) {
+    if (error.message === "UNAUTHORIZED") {
+      window.location.href = "/admin.html";
+      return;
+    }
+    setStatus(error.message || "ลบรูปไม่สำเร็จ");
+  }
+}
+
+async function deleteSelectedActivity() {
+  const activityId = els.activitySelect?.value || "";
+  const activity = activities.find((item) => item.id === activityId);
+
+  if (!activity) {
+    setStatus("กรุณาเลือกโฟลเดอร์กิจกรรมก่อนลบ");
+    return;
+  }
+
+  if (activity.id === "general") {
+    setStatus("ลบโฟลเดอร์เริ่มต้นไม่ได้");
+    return;
+  }
+
+  if (!window.confirm(`ลบโฟลเดอร์ "${activity.name}" พร้อมรูปทั้งหมด?`)) {
+    return;
+  }
+
+  try {
+    await apiDelete(`/api/admin/activities/${encodeURIComponent(activity.id)}`);
+    await loadActivityIndex();
+    await loadAdminPhotos();
+    await loadGooglePhotosStatus();
+    setStatus(`ลบโฟลเดอร์ "${activity.name}" แล้ว`);
+  } catch (error) {
+    if (error.message === "UNAUTHORIZED") {
+      window.location.href = "/admin.html";
+      return;
+    }
+    setStatus(error.message || "ลบโฟลเดอร์ไม่สำเร็จ");
+  }
+}
+
 function renderActivityControls() {
   const currentUploadActivity = els.activitySelect?.value || "";
   const currentFilter = els.activityFilter?.value || "all";
@@ -343,6 +581,16 @@ function renderActivityControls() {
       )
       .join("");
   }
+  updateDeleteActivityButton();
+}
+
+function updateDeleteActivityButton() {
+  if (!els.deleteActivityBtn) {
+    return;
+  }
+
+  const selected = activities.find((activity) => activity.id === (els.activitySelect?.value || ""));
+  els.deleteActivityBtn.disabled = !selected || selected.id === "general";
 }
 
 function updateSelectedStats() {
@@ -367,7 +615,7 @@ async function handleGalleryFiles(fileList) {
     return;
   }
 
-  if (!els.consentCheck?.checked) {
+  if (page !== "admin" && !els.consentCheck?.checked) {
     setStatus("กรุณายืนยันสิทธิ์การใช้รูปก่อนอัปโหลด");
     els.consentCheck?.focus();
     return;
@@ -450,6 +698,7 @@ async function handleGalleryFiles(fileList) {
   if (els.activitySelect) {
     els.activitySelect.value = activity.id;
   }
+  await loadAdminPhotos();
   setStatus(`อัปโหลดเรียบร้อย รูปถูกเก็บในเว็บและโฟลเดอร์ “${activity.name}”`);
 }
 
@@ -765,6 +1014,40 @@ async function apiPost(url, payload) {
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     throw new Error(body.error || `POST ${url} failed`);
+  }
+
+  return response.json();
+}
+
+async function apiPatch(url, payload) {
+  const response = await fetch(url, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  if (response.status === 401) {
+    throw new Error("UNAUTHORIZED");
+  }
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error || `PATCH ${url} failed`);
+  }
+
+  return response.json();
+}
+
+async function apiDelete(url) {
+  const response = await fetch(url, { method: "DELETE" });
+
+  if (response.status === 401) {
+    throw new Error("UNAUTHORIZED");
+  }
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error || `DELETE ${url} failed`);
   }
 
   return response.json();
