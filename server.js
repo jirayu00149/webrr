@@ -1251,12 +1251,13 @@ async function makeShareLinkPayload(request, state = null) {
   const shareState = state || await readShareState();
   const pathName = `/s/${shareState.token}`;
   const displayUrl = `www.photobss${pathName}`;
+  const url = `${getOrigin(request)}${pathName}`;
   return {
     token: shareState.token,
     path: pathName,
     displayUrl,
-    url: `https://${displayUrl}`,
-    localUrl: `${getOrigin(request)}${pathName}`,
+    url,
+    localUrl: url,
     galleryUrl: shareState.galleryUrl || "",
     createdAt: shareState.createdAt || 0,
     updatedAt: shareState.updatedAt || 0

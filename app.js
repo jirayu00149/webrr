@@ -60,6 +60,7 @@ let googlePhotosStatus = null;
 let adminPhotos = [];
 let galleryLink = "";
 let currentShareLinkText = "";
+let currentShareLinkUrl = "";
 
 document.addEventListener("DOMContentLoaded", init);
 
@@ -331,7 +332,8 @@ function renderShareLink(body) {
   }
 
   currentShareLinkText = body.displayUrl || body.url || body.path || "user.html";
-  els.shareLink.href = body.localUrl || body.url || body.path || "user.html";
+  currentShareLinkUrl = body.url || body.localUrl || body.path || "user.html";
+  els.shareLink.href = currentShareLinkUrl;
   els.shareLink.textContent = currentShareLinkText;
 }
 
@@ -357,13 +359,13 @@ function renderGalleryLink(body = {}) {
 }
 
 async function copyShareLink() {
-  const text = currentShareLinkText || els.shareLink?.textContent || "";
-  if (!text) {
+  const url = currentShareLinkUrl || els.shareLink?.href || "";
+  if (!url) {
     return;
   }
 
   try {
-    await writeClipboardText(text);
+    await writeClipboardText(url);
     setStatus("คัดลอกลิงก์แจกแล้ว");
   } catch {
     setStatus("คัดลอกลิงก์ไม่สำเร็จ");
