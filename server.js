@@ -16,6 +16,7 @@ const photosFile = path.join(dataDir, "photos.json");
 const activitiesFile = path.join(dataDir, "activities.json");
 const shareFile = path.join(dataDir, "share.json");
 const googlePhotosConfigFile = path.join(root, "googlePhotosConfig.json");
+const googlePhotosRuntimeConfigFile = path.join(dataDir, "google-photos-config.json");
 const googlePhotosTokenFile = path.join(dataDir, "google-photos-token.json");
 const googlePhotosOAuthStateCookie = "sff_google_photos_state";
 const googlePhotosScope = "https://www.googleapis.com/auth/photoslibrary.appendonly";
@@ -371,6 +372,33 @@ async function handleApi(request, response, url) {
     return;
   }
 
+  if (url.pathname === "/api/admin/google-photos/config" && request.method === "GET") {
+    if (!isAuthenticated(request)) {
+      sendJson(response, 401, { error: "Admin login required" });
+      return;
+    }
+
+    sendJson(response, 200, { config: publicGooglePhotosConfig() });
+    return;
+  }
+
+  if (url.pathname === "/api/admin/google-photos/config" && request.method === "PATCH") {
+    if (!isAuthenticated(request)) {
+      sendJson(response, 401, { error: "Admin login required" });
+      return;
+    }
+
+    const body = await readJsonBody(request, 64 * 1024);
+    const result = await updateGooglePhotosRuntimeConfig(body);
+    const photos = await readPhotos();
+    sendJson(response, result.ok ? 200 : 400, {
+      ...result,
+      config: publicGooglePhotosConfig(),
+      googlePhotos: makeGooglePhotosSummary(photos)
+    });
+    return;
+  }
+
   if (url.pathname === "/api/admin/google-photos/connect" && request.method === "GET") {
     if (!isAuthenticated(request)) {
       redirect(response, "/admin.html");
@@ -605,30 +633,35 @@ function normalizeFace(face) {
 
 function getGooglePhotosConfig() {
   const fileConfig = readJsonFileSync(googlePhotosConfigFile);
+  const runtimeConfig = readJsonFileSync(googlePhotosRuntimeConfigFile);
   const tokenConfig = readJsonFileSync(googlePhotosTokenFile);
   const clientId =
     process.env.GOOGLE_PHOTOS_CLIENT_ID ||
     process.env.GOOGLE_CLIENT_ID ||
+    runtimeConfig.clientId ||
     fileConfig.clientId ||
     "";
   const clientSecret =
     process.env.GOOGLE_PHOTOS_CLIENT_SECRET ||
     process.env.GOOGLE_CLIENT_SECRET ||
+    runtimeConfig.clientSecret ||
     fileConfig.clientSecret ||
     "";
   const refreshToken =
     process.env.GOOGLE_PHOTOS_REFRESH_TOKEN ||
     process.env.GOOGLE_REFRESH_TOKEN ||
+    runtimeConfig.refreshToken ||
     fileConfig.refreshToken ||
     tokenConfig.refreshToken ||
     tokenConfig.refresh_token ||
     "";
   const albumId =
     process.env.GOOGLE_PHOTOS_ALBUM_ID ||
+    runtimeConfig.albumId ||
     fileConfig.albumId ||
     "";
   const enabled = boolFrom(
-    process.env.GOOGLE_PHOTOS_ENABLED ?? fileConfig.enabled,
+    process.env.GOOGLE_PHOTOS_ENABLED ?? runtimeConfig.enabled ?? fileConfig.enabled,
     Boolean(clientId && clientSecret)
   );
 
@@ -641,6 +674,61 @@ function getGooglePhotosConfig() {
     oauthConfigured: Boolean(clientId && clientSecret),
     connected: Boolean(refreshToken)
   };
+}
+
+function publicGooglePhotosConfig() {
+  const config = getGooglePhotosConfig();
+  return {
+    enabled: config.enabled,
+    clientId: config.clientId || "",
+    hasClientSecret: Boolean(config.clientSecret),
+    albumId: config.albumId || "",
+    connected: config.connected,
+    usingEnv:
+      Boolean(process.env.GOOGLE_PHOTOS_CLIENT_ID || process.env.GOOGLE_CLIENT_ID) ||
+      Boolean(process.env.GOOGLE_PHOTOS_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET)
+  };
+}
+
+async function updateGooglePhotosRuntimeConfig(body) {
+  const next = readJsonFileSync(googlePhotosRuntimeConfigFile);
+
+  if (Object.prototype.hasOwnProperty.call(body, "enabled")) {
+    next.enabled = Boolean(body.enabled);
+  } else {
+    next.enabled = true;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, "clientId")) {
+    next.clientId = sanitizeConfigValue(body.clientId);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, "clientSecret")) {
+    const clientSecret = sanitizeConfigValue(body.clientSecret);
+    if (clientSecret) {
+      next.clientSecret = clientSecret;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, "albumId")) {
+    next.albumId = sanitizeConfigValue(body.albumId);
+  }
+
+  if (!next.clientId || !next.clientSecret) {
+    return { ok: false, error: "กรุณาใส่ Google Photos Client ID และ Client Secret" };
+  }
+
+  await fsp.mkdir(dataDir, { recursive: true });
+  await fsp.writeFile(
+    googlePhotosRuntimeConfigFile,
+    `${JSON.stringify(next, null, 2)}\n`,
+    "utf8"
+  );
+  return { ok: true };
+}
+
+function sanitizeConfigValue(value) {
+  return String(value || "").trim().slice(0, 500);
 }
 
 function readJsonFileSync(filePath) {

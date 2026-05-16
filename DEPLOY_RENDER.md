@@ -17,6 +17,9 @@ This project must run as a Render **Web Service**, not a Static Site. The browse
      - `GOOGLE_PHOTOS_CLIENT_SECRET`
      - `GOOGLE_PHOTOS_REFRESH_TOKEN` (added after OAuth connect, or set manually)
      - `GOOGLE_PHOTOS_ALBUM_ID` (optional target album)
+   You can also enter the Google Photos Client ID and Client Secret from the admin page. The server stores them in `DATA_DIR/google-photos-config.json`, then sends you to Google OAuth to connect the account.
+   In Google Console, add this Authorized redirect URI:
+   `https://YOUR-SERVICE.onrender.com/api/google-photos/oauth/callback`
 5. Deploy, then open:
    - Public page: `https://YOUR-SERVICE.onrender.com/user.html`
    - Admin page: `https://YOUR-SERVICE.onrender.com/admin.html`

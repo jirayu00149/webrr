@@ -47,7 +47,12 @@ const els = {
   userSaveLink: $("#userSaveLink"),
   googlePhotosState: $("#googlePhotosState"),
   googlePhotosConnectBtn: $("#googlePhotosConnectBtn"),
-  googlePhotosSyncBtn: $("#googlePhotosSyncBtn")
+  googlePhotosSyncBtn: $("#googlePhotosSyncBtn"),
+  googleClientIdInput: $("#googleClientIdInput"),
+  googleClientSecretInput: $("#googleClientSecretInput"),
+  googleAlbumIdInput: $("#googleAlbumIdInput"),
+  saveGoogleConfigBtn: $("#saveGoogleConfigBtn"),
+  googleRedirectUri: $("#googleRedirectUri")
 };
 
 let modelsReady = false;
@@ -66,6 +71,7 @@ document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
   bindEvents();
+  renderGoogleRedirectUri();
 
   if (page === "login") {
     els.adminPassword?.focus();
@@ -76,6 +82,7 @@ async function init() {
     await loadActivityIndex();
     if (page === "admin") {
       await loadShareLink();
+      await loadGooglePhotosConfig();
       await loadGooglePhotosStatus();
       await loadAdminPhotos();
     }
@@ -163,6 +170,7 @@ function bindEvents() {
   els.consentCheck?.addEventListener("change", updateSearchButton);
   els.exportBtn?.addEventListener("click", exportResults);
   els.googlePhotosSyncBtn?.addEventListener("click", syncGooglePhotosBacklog);
+  els.saveGoogleConfigBtn?.addEventListener("click", saveGooglePhotosConfig);
 }
 
 async function handleLogin(event) {
@@ -400,6 +408,84 @@ function renderUserSaveLink() {
 
   els.userSaveLink.href = galleryLink || "#";
   els.userSaveLink.classList.toggle("hidden", !galleryLink);
+}
+
+function renderGoogleRedirectUri() {
+  if (els.googleRedirectUri) {
+    els.googleRedirectUri.textContent =
+      `${window.location.origin}/api/google-photos/oauth/callback`;
+  }
+}
+
+async function loadGooglePhotosConfig() {
+  if (!els.googleClientIdInput) {
+    return;
+  }
+
+  try {
+    const body = await apiGet("/api/admin/google-photos/config");
+    renderGooglePhotosConfig(body.config || {});
+  } catch (error) {
+    if (error.message === "UNAUTHORIZED") {
+      window.location.href = "/admin.html";
+    }
+  }
+}
+
+function renderGooglePhotosConfig(config) {
+  if (els.googleClientIdInput) {
+    els.googleClientIdInput.value = config.clientId || "";
+  }
+
+  if (els.googleClientSecretInput) {
+    els.googleClientSecretInput.value = "";
+    els.googleClientSecretInput.placeholder = config.hasClientSecret
+      ? "ตั้งไว้แล้ว เว้นว่างไว้ถ้าไม่เปลี่ยน"
+      : "ใส่ Client Secret";
+  }
+
+  if (els.googleAlbumIdInput) {
+    els.googleAlbumIdInput.value = config.albumId || "";
+  }
+}
+
+async function saveGooglePhotosConfig() {
+  if (!els.saveGoogleConfigBtn) {
+    return;
+  }
+
+  const payload = {
+    clientId: els.googleClientIdInput?.value.trim() || "",
+    clientSecret: els.googleClientSecretInput?.value.trim() || "",
+    albumId: els.googleAlbumIdInput?.value.trim() || "",
+    enabled: true
+  };
+
+  els.saveGoogleConfigBtn.disabled = true;
+  els.saveGoogleConfigBtn.textContent = "กำลังตั้งค่า...";
+
+  try {
+    const body = await apiPatch("/api/admin/google-photos/config", payload);
+    renderGooglePhotosConfig(body.config || {});
+    googlePhotosStatus = body.googlePhotos || googlePhotosStatus;
+    renderGooglePhotosStatus();
+
+    if (body.googlePhotos?.oauthConfigured && !body.googlePhotos?.connected) {
+      window.location.href = body.googlePhotos.connectUrl || "/api/admin/google-photos/connect";
+      return;
+    }
+
+    setStatus("ตั้งค่า Google Photos แล้ว");
+  } catch (error) {
+    if (error.message === "UNAUTHORIZED") {
+      window.location.href = "/admin.html";
+      return;
+    }
+    setStatus(error.message || "ตั้งค่า Google Photos ไม่สำเร็จ");
+  } finally {
+    els.saveGoogleConfigBtn.disabled = false;
+    els.saveGoogleConfigBtn.textContent = "บันทึกและเชื่อมต่อ";
+  }
 }
 
 async function loadGooglePhotosStatus() {

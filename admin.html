@@ -181,6 +181,41 @@
               ซิงก์รูปที่ค้าง
             </button>
           </div>
+          <div class="google-config-form">
+            <label>
+              Google Photos Client ID
+              <input
+                id="googleClientIdInput"
+                type="text"
+                autocomplete="off"
+                placeholder="xxxxxxxx.apps.googleusercontent.com"
+              />
+            </label>
+            <label>
+              Google Photos Client Secret
+              <input
+                id="googleClientSecretInput"
+                type="password"
+                autocomplete="new-password"
+                placeholder="ใส่ Client Secret"
+              />
+            </label>
+            <label>
+              Album ID (ไม่บังคับ)
+              <input
+                id="googleAlbumIdInput"
+                type="text"
+                autocomplete="off"
+                placeholder="เว้นว่างถ้าให้ Google Photos สร้างเอง"
+              />
+            </label>
+            <button class="secondary-button small-button" id="saveGoogleConfigBtn" type="button">
+              บันทึกและเชื่อมต่อ
+            </button>
+            <p class="small-note google-redirect-note">
+              Redirect URI: <code id="googleRedirectUri">/api/google-photos/oauth/callback</code>
+            </p>
+          </div>
         </div>
       </section>
 
