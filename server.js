@@ -50,7 +50,7 @@ const server = http.createServer(async (request, response) => {
     const url = new URL(request.url, `http://${request.headers.host}`);
 
     if (url.pathname === "/") {
-      redirect(response, "/user.html");
+      await serveStatic(response, "index.html");
       return;
     }
 

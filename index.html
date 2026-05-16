@@ -3,23 +3,57 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Admin Login | School Face Finder</title>
+    <meta
+      name="description"
+      content="School Face Finder portal for public search and admin upload."
+    />
+    <title>School Face Finder</title>
     <link rel="stylesheet" href="styles.css" />
-    <script defer src="app.js"></script>
   </head>
-  <body data-page="login">
-    <main class="login-shell app-shell">
-      <section class="panel login-card">
-        <span class="brand-mark">SF</span>
-        <h1>Admin upload</h1>
-        <p>เข้าสู่ระบบ</p>
+  <body>
+    <main class="app-shell portal-hero">
+      <section class="portal-copy">
+        <a class="brand" href="/" aria-label="School Face Finder">
+          <span class="brand-mark">SF</span>
+          <span>
+            <strong>School Face Finder</strong>
+            <small>ค้นหารูปกิจกรรมโรงเรียน</small>
+          </span>
+        </a>
+        <h1>เลือกหน้าที่ต้องการเข้าใช้งาน</h1>
+        <p>
+          ผู้ใช้ทั่วไปสามารถค้นหารูปจากใบหน้าตัวอย่าง ส่วนแอดมินเข้าไปสร้างกิจกรรม
+          อัปโหลดรูป และจัดการคลังรูปของเว็บ
+        </p>
+        <div class="hero-actions">
+          <a class="primary-button link-button" href="user.html">เข้าใช้งานหน้า User</a>
+          <a class="secondary-button link-button" href="admin.html">เข้าสู่ระบบ Admin</a>
+        </div>
+      </section>
 
-        <form class="login-form" id="loginForm">
-          <label for="adminPassword">รหัสผ่านแอดมิน</label>
-          <input id="adminPassword" type="password" autocomplete="current-password" required />
-          <button class="primary-button" type="submit">เข้าสู่ระบบ</button>
-          <p class="form-error" id="loginError" role="alert"></p>
-        </form>
+      <section class="portal-dashboard" aria-label="School Face Finder preview">
+        <div class="mini-window">
+          <div class="mini-window-top">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <div class="scan-preview">
+            <div class="scan-photo photo-a"></div>
+            <div class="scan-photo photo-b"></div>
+            <div class="face-frame"></div>
+          </div>
+        </div>
+        <div class="metric-strip">
+          <div>
+            <span class="metric-label">Public</span>
+            <strong>Search</strong>
+          </div>
+          <div>
+            <span class="metric-label">Admin</span>
+            <strong>Upload</strong>
+          </div>
+        </div>
       </section>
     </main>
   </body>
