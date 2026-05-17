@@ -63,6 +63,14 @@ https://www.photobss.com/api/google-drive/oauth/callback
 wrangler deploy
 ```
 
+If Wrangler asks this on the first deploy:
+
+```text
+Would you like to register a workers.dev subdomain now?
+```
+
+Choose `yes`, then set a subdomain name. This is a one-time Cloudflare account setup. Without it, Cloudflare can upload the Worker but cannot publish it to a `workers.dev` URL.
+
 Cloudflare Workers Free is enough for this app at small school-event scale. Workers has a daily free request limit, KV has free included usage, and static assets can be served together with the Worker. Large photo files still live in Google Drive, not inside KV.
 
 ## Notes

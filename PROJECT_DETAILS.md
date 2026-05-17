@@ -16,6 +16,8 @@
 
 ปิดคอม ปิด VS Code หรือปิด PowerShell ได้ เว็บยังออนไลน์อยู่ตามปกติ สิ่งที่จะหยุดมีแค่ server local เวลาทดสอบบนเครื่อง เช่น `localhost`
 
+ถ้า `wrangler deploy` แจ้งว่ายังไม่มี `workers.dev subdomain` ให้ register subdomain ใน Cloudflare หนึ่งครั้งก่อน หลังจากนั้น deploy รอบต่อไปจะ publish ได้ปกติ
+
 ## ไฟล์สำคัญ
 
 - `cloudflare-worker.mjs` คือ server ที่รันบน Cloudflare Workers
