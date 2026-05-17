@@ -394,6 +394,7 @@ async function handleApi(request, response, url) {
       return;
     }
 
+    await ensureDefaultActivityDriveFolder();
     const photos = await readPhotos();
     const summary = makeGoogleDriveSummary(photos);
     await updateShareGalleryFromDrive(summary.folderUrl);
@@ -419,6 +420,7 @@ async function handleApi(request, response, url) {
 
     const body = await readJsonBody(request, 256 * 1024);
     const result = await updateGoogleDriveRuntimeConfig(body);
+    await ensureDefaultActivityDriveFolder();
     const photos = await readPhotos();
     const summary = makeGoogleDriveSummary(photos);
     await updateShareGalleryFromDrive(summary.folderUrl);
@@ -1299,12 +1301,19 @@ async function getGoogleDrivePhotoFolder(photo, config, accessToken) {
   }
 
   if (activity.googleDriveFolderId) {
-    return {
-      id: activity.googleDriveFolderId,
-      url:
-        activity.googleDriveFolderUrl ||
-        `https://drive.google.com/drive/folders/${activity.googleDriveFolderId}`
-    };
+    const folderExists = await googleDriveFolderExists(accessToken, activity.googleDriveFolderId);
+    if (folderExists) {
+      return {
+        id: activity.googleDriveFolderId,
+        url:
+          activity.googleDriveFolderUrl ||
+          `https://drive.google.com/drive/folders/${activity.googleDriveFolderId}`
+      };
+    }
+
+    delete activity.googleDriveFolderId;
+    delete activity.googleDriveFolderUrl;
+    delete activity.googleDriveFolderError;
   }
 
   const folderName = sanitizeGoogleDriveFolderName(activity.name || photo.activityName || "activity");
@@ -1332,7 +1341,7 @@ async function getGoogleDrivePhotoFolder(photo, config, accessToken) {
 async function createGoogleDriveFolderForActivity(activity, activities) {
   const config = getGoogleDriveConfig();
 
-  if (!activity || activity.googleDriveFolderId || !config.enabled || !config.configured) {
+  if (!activity || !config.enabled || !config.configured) {
     return {
       status: "skipped"
     };
@@ -1340,6 +1349,23 @@ async function createGoogleDriveFolderForActivity(activity, activities) {
 
   try {
     const accessToken = await getGoogleDriveAccessToken(config);
+    if (activity.googleDriveFolderId) {
+      const folderExists = await googleDriveFolderExists(accessToken, activity.googleDriveFolderId);
+      if (folderExists) {
+        return {
+          status: "saved",
+          folderId: activity.googleDriveFolderId,
+          folderUrl:
+            activity.googleDriveFolderUrl ||
+            `https://drive.google.com/drive/folders/${activity.googleDriveFolderId}`
+        };
+      }
+
+      delete activity.googleDriveFolderId;
+      delete activity.googleDriveFolderUrl;
+      delete activity.googleDriveFolderError;
+    }
+
     const folderName = sanitizeGoogleDriveFolderName(activity.name || "activity");
     const folder = await createGoogleDriveFolder(accessToken, {
       name: folderName,
@@ -1401,6 +1427,30 @@ async function createGoogleDriveFolder(accessToken, options) {
     },
     body
   );
+}
+
+async function googleDriveFolderExists(accessToken, folderId) {
+  if (!folderId) {
+    return false;
+  }
+
+  try {
+    const folder = await requestJson(
+      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(folderId)}?supportsAllDrives=true&fields=id,mimeType,trashed`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        }
+      }
+    );
+    return folder.mimeType === "application/vnd.google-apps.folder" && folder.trashed !== true;
+  } catch (error) {
+    if (error.status === 404) {
+      return false;
+    }
+    throw error;
+  }
 }
 
 function makeServiceAccountJwt(serviceAccount, options) {
@@ -2201,10 +2251,58 @@ async function makeShareLinkPayload(request, state = null) {
 async function readActivities() {
   try {
     const activities = JSON.parse(await fsp.readFile(activitiesFile, "utf8"));
-    return activities.length ? activities : [defaultActivity];
+    const result = ensureDefaultActivity(Array.isArray(activities) ? activities : []);
+    if (result.changed) {
+      await writeActivities(result.activities);
+    }
+    return result.activities;
   } catch {
-    return [defaultActivity];
+    const activities = [{ ...defaultActivity }];
+    await writeActivities(activities);
+    return activities;
   }
+}
+
+async function ensureDefaultActivityDriveFolder() {
+  const activities = await readActivities();
+  const activity = activities.find((item) => item.id === defaultActivity.id);
+  if (!activity) {
+    return;
+  }
+
+  await createGoogleDriveFolderForActivity(activity, activities);
+}
+
+function ensureDefaultActivity(activities) {
+  const next = activities
+    .filter((activity) => activity && typeof activity === "object")
+    .map((activity) => ({ ...activity }));
+  const defaultIndex = next.findIndex(
+    (activity) => activity.id === defaultActivity.id || activity.slug === defaultActivity.slug
+  );
+  let changed = false;
+
+  if (defaultIndex === -1) {
+    next.unshift({ ...defaultActivity });
+    changed = true;
+  } else {
+    const current = next[defaultIndex];
+    const normalized = {
+      ...current,
+      id: defaultActivity.id,
+      name: defaultActivity.name,
+      slug: defaultActivity.slug,
+      createdAt: Number(current.createdAt || 0)
+    };
+    changed = JSON.stringify(current) !== JSON.stringify(normalized) || defaultIndex !== 0;
+    next.splice(defaultIndex, 1);
+    next.unshift(normalized);
+  }
+
+  return {
+    activities: next.length ? next : [{ ...defaultActivity }],
+    changed
+  };
 }
 
 async function writeActivities(activities) {

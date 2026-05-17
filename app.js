@@ -581,6 +581,7 @@ async function loadGoogleDriveStatus() {
     const body = await apiGet("/api/admin/google-drive");
     googleDriveStatus = body.googleDrive || null;
     renderGoogleDriveStatus();
+    await loadActivityIndex();
   } catch (error) {
     if (error.message === "UNAUTHORIZED") {
       window.location.href = "/admin.html";

@@ -10,7 +10,7 @@ const DRIVE_STATE_COOKIE = "sff_google_drive_state";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const DEFAULT_ACTIVITY = {
   id: "general",
-  name: "General",
+  name: "ทั่วไป",
   slug: "general",
   createdAt: 0
 };
@@ -271,6 +271,7 @@ async function handleApi(request, env, url) {
 
   if (url.pathname === "/api/admin/google-drive" && request.method === "GET") {
     if (!(await isAuthenticated(request, env))) return unauthorized();
+    await ensureDefaultActivityDriveFolder(env);
     const photos = await readPhotos(env);
     const summary = await makeGoogleDriveSummary(env, photos);
     await updateShareGalleryFromDrive(env, summary.folderUrl);
@@ -286,6 +287,7 @@ async function handleApi(request, env, url) {
     if (!(await isAuthenticated(request, env))) return unauthorized();
     const body = await request.json().catch(() => ({}));
     const result = await updateGoogleDriveRuntimeConfig(env, body);
+    await ensureDefaultActivityDriveFolder(env);
     const photos = await readPhotos(env);
     const summary = await makeGoogleDriveSummary(env, photos);
     await updateShareGalleryFromDrive(env, summary.folderUrl);
@@ -601,10 +603,17 @@ async function getGoogleDrivePhotoFolder(env, photo, config, accessToken) {
   }
 
   if (activity.googleDriveFolderId) {
-    return {
-      id: activity.googleDriveFolderId,
-      url: activity.googleDriveFolderUrl || `https://drive.google.com/drive/folders/${activity.googleDriveFolderId}`
-    };
+    const folderExists = await googleDriveFolderExists(accessToken, activity.googleDriveFolderId);
+    if (folderExists) {
+      return {
+        id: activity.googleDriveFolderId,
+        url: activity.googleDriveFolderUrl || `https://drive.google.com/drive/folders/${activity.googleDriveFolderId}`
+      };
+    }
+
+    delete activity.googleDriveFolderId;
+    delete activity.googleDriveFolderUrl;
+    delete activity.googleDriveFolderError;
   }
 
   const folder = await createGoogleDriveFolder(accessToken, {
@@ -632,12 +641,29 @@ async function getGoogleDrivePhotoFolder(env, photo, config, accessToken) {
 async function createGoogleDriveFolderForActivity(env, activity, activities) {
   const config = await getGoogleDriveConfig(env);
 
-  if (!activity || activity.googleDriveFolderId || !config.enabled || !config.configured) {
+  if (!activity || !config.enabled || !config.configured) {
     return { status: "skipped" };
   }
 
   try {
     const accessToken = await getGoogleDriveAccessToken(config);
+    if (activity.googleDriveFolderId) {
+      const folderExists = await googleDriveFolderExists(accessToken, activity.googleDriveFolderId);
+      if (folderExists) {
+        return {
+          status: "saved",
+          folderId: activity.googleDriveFolderId,
+          folderUrl:
+            activity.googleDriveFolderUrl ||
+            `https://drive.google.com/drive/folders/${activity.googleDriveFolderId}`
+        };
+      }
+
+      delete activity.googleDriveFolderId;
+      delete activity.googleDriveFolderUrl;
+      delete activity.googleDriveFolderError;
+    }
+
     const folder = await createGoogleDriveFolder(accessToken, {
       name: sanitizeGoogleDriveFolderName(activity.name || "activity"),
       parentId: config.folderId
@@ -956,6 +982,30 @@ async function createGoogleDriveFolder(accessToken, options) {
   );
 }
 
+async function googleDriveFolderExists(accessToken, folderId) {
+  if (!folderId) {
+    return false;
+  }
+
+  const response = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(folderId)}?supportsAllDrives=true&fields=id,mimeType,trashed`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+
+  if (response.status === 404) {
+    return false;
+  }
+
+  const text = await response.text();
+  const body = text ? JSON.parse(text) : {};
+  if (!response.ok) {
+    const message = body.error?.message || body.error || response.statusText;
+    throw new Error(message);
+  }
+
+  return body.mimeType === "application/vnd.google-apps.folder" && body.trashed !== true;
+}
+
 async function uploadGoogleDriveFile(accessToken, options) {
   const boundary = `sff_drive_${randomToken().slice(0, 24)}`;
   const metadata = {
@@ -1038,8 +1088,54 @@ async function requestJson(url, init) {
 }
 
 async function readActivities(env) {
-  const activities = await readJson(env, DATA_KEYS.activities, [DEFAULT_ACTIVITY]);
-  return Array.isArray(activities) && activities.length ? activities : [DEFAULT_ACTIVITY];
+  const storedActivities = await readJson(env, DATA_KEYS.activities, []);
+  const result = ensureDefaultActivity(Array.isArray(storedActivities) ? storedActivities : []);
+  if (result.changed) {
+    await writeJson(env, DATA_KEYS.activities, result.activities);
+  }
+  return result.activities;
+}
+
+async function ensureDefaultActivityDriveFolder(env) {
+  const activities = await readActivities(env);
+  const defaultActivity = activities.find((activity) => activity.id === DEFAULT_ACTIVITY.id);
+  if (!defaultActivity) {
+    return;
+  }
+
+  await createGoogleDriveFolderForActivity(env, defaultActivity, activities);
+}
+
+function ensureDefaultActivity(activities) {
+  const next = activities
+    .filter((activity) => activity && typeof activity === "object")
+    .map((activity) => ({ ...activity }));
+  const defaultIndex = next.findIndex(
+    (activity) => activity.id === DEFAULT_ACTIVITY.id || activity.slug === DEFAULT_ACTIVITY.slug
+  );
+  let changed = false;
+
+  if (defaultIndex === -1) {
+    next.unshift({ ...DEFAULT_ACTIVITY });
+    changed = true;
+  } else {
+    const current = next[defaultIndex];
+    const normalized = {
+      ...current,
+      id: DEFAULT_ACTIVITY.id,
+      name: DEFAULT_ACTIVITY.name,
+      slug: DEFAULT_ACTIVITY.slug,
+      createdAt: Number(current.createdAt || 0)
+    };
+    changed = JSON.stringify(current) !== JSON.stringify(normalized) || defaultIndex !== 0;
+    next.splice(defaultIndex, 1);
+    next.unshift(normalized);
+  }
+
+  return {
+    activities: next.length ? next : [{ ...DEFAULT_ACTIVITY }],
+    changed
+  };
 }
 
 async function readPhotos(env) {
