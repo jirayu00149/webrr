@@ -219,6 +219,11 @@ async function handleCreateActivity(event) {
     if (body.activity?.id && els.activitySelect) {
       els.activitySelect.value = body.activity.id;
     }
+    if (body.galleryUrl || body.activity?.googleDriveFolderUrl) {
+      renderGalleryLink({
+        galleryUrl: body.activity?.googleDriveFolderUrl || body.galleryUrl
+      });
+    }
     await loadAdminPhotos();
     if (body.activity?.googleDriveFolderUrl) {
       setStatus(`Created "${name}" and its Google Drive folder.`);

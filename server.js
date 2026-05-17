@@ -224,9 +224,11 @@ async function handleApi(request, response, url) {
 
     const activity = await createActivity(name);
     const photos = await readPhotos();
+    const shareState = await readShareState();
     sendJson(response, 201, {
       activity: addActivityCounts([activity], photos)[0],
       activities: addActivityCounts(await readActivities(), photos),
+      galleryUrl: shareState.galleryUrl || "",
       stats: makeStats(photos)
     });
     return;
@@ -1345,7 +1347,7 @@ async function createGoogleDriveFolderForActivity(activity, activities) {
     activity.googleDriveFolderUrl = folderUrl;
     delete activity.googleDriveFolderError;
     await writeActivities(activities);
-    await updateShareGalleryFromDrive(config.folderUrl);
+    await updateShareGalleryFromDrive(folderUrl);
 
     return {
       status: "saved",
