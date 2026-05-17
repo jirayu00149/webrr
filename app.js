@@ -33,6 +33,10 @@ const els = {
   activityName: $("#activityName"),
   activitySelect: $("#activitySelect"),
   deleteActivityBtn: $("#deleteActivityBtn"),
+  selectedActivityDrive: $("#selectedActivityDrive"),
+  selectedActivityDriveName: $("#selectedActivityDriveName"),
+  selectedActivityDriveState: $("#selectedActivityDriveState"),
+  selectedActivityDriveLink: $("#selectedActivityDriveLink"),
   activityFilter: $("#activityFilter"),
   activityList: $("#activityList"),
   adminPhotoGrid: $("#adminPhotoGrid"),
@@ -115,6 +119,7 @@ function bindEvents() {
 
   els.activitySelect?.addEventListener("change", () => {
     updateDeleteActivityButton();
+    renderSelectedActivityDriveLink();
     loadAdminPhotos();
   });
 
@@ -224,6 +229,7 @@ async function handleCreateActivity(event) {
     await loadActivityIndex();
     if (body.activity?.id && els.activitySelect) {
       els.activitySelect.value = body.activity.id;
+      renderSelectedActivityDriveLink();
     }
     if (body.galleryUrl || body.activity?.googleDriveFolderUrl) {
       renderGalleryLink({
@@ -805,7 +811,10 @@ function renderActivityControls() {
 
   if (els.activitySelect) {
     els.activitySelect.innerHTML = activities
-      .map((activity) => `<option value="${escapeHtml(activity.id)}">${escapeHtml(activity.name)}</option>`)
+      .map((activity) => {
+        const driveLabel = activity.googleDriveFolderUrl ? " · มีลิงก์ Drive" : "";
+        return `<option value="${escapeHtml(activity.id)}">${escapeHtml(activity.name)}${driveLabel}</option>`;
+      })
       .join("");
     if (activities.some((activity) => activity.id === currentUploadActivity)) {
       els.activitySelect.value = currentUploadActivity;
@@ -833,7 +842,9 @@ function renderActivityControls() {
       )
       .join("");
   }
+  renderActivityListLinks();
   updateDeleteActivityButton();
+  renderSelectedActivityDriveLink();
 }
 
 function updateDeleteActivityButton() {
@@ -843,6 +854,74 @@ function updateDeleteActivityButton() {
 
   const selected = activities.find((activity) => activity.id === (els.activitySelect?.value || ""));
   els.deleteActivityBtn.disabled = !selected || selected.id === "general";
+}
+
+function renderActivityListLinks() {
+  if (!els.activityList) {
+    return;
+  }
+
+  els.activityList.innerHTML = "";
+
+  for (const activity of activities) {
+    const row = document.createElement("div");
+    row.className = "activity-chip";
+
+    const meta = document.createElement("div");
+    const title = document.createElement("strong");
+    const detail = document.createElement("small");
+    title.textContent = activity.name;
+    detail.textContent = `${activity.photosCount} รูป · ${activity.facesCount} ใบหน้า`;
+    meta.append(title, detail);
+
+    if (activity.googleDriveFolderUrl) {
+      const link = document.createElement("a");
+      link.className = "activity-drive-pill";
+      link.href = activity.googleDriveFolderUrl;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = "เปิด Drive";
+      row.append(meta, link);
+    } else {
+      const pending = document.createElement("span");
+      pending.className = "activity-drive-pill pending";
+      pending.textContent = "ยังไม่มีลิงก์ Drive";
+      row.append(meta, pending);
+    }
+
+    els.activityList.append(row);
+  }
+}
+
+function renderSelectedActivityDriveLink() {
+  if (!els.selectedActivityDrive) {
+    return;
+  }
+
+  const selected = activities.find((activity) => activity.id === (els.activitySelect?.value || ""));
+  els.selectedActivityDrive.classList.toggle("hidden", !selected);
+
+  if (!selected) {
+    return;
+  }
+
+  const folderUrl = selected.googleDriveFolderUrl || "";
+  if (els.selectedActivityDriveName) {
+    els.selectedActivityDriveName.textContent = selected.name;
+  }
+
+  if (els.selectedActivityDriveState) {
+    els.selectedActivityDriveState.textContent = folderUrl
+      ? "โฟลเดอร์นี้เชื่อมกับ Google Drive แล้ว"
+      : selected.googleDriveFolderError
+        ? `สร้างลิงก์ Drive ไม่สำเร็จ: ${selected.googleDriveFolderError}`
+        : "ยังไม่มีลิงก์ Drive สำหรับโฟลเดอร์นี้";
+  }
+
+  if (els.selectedActivityDriveLink) {
+    els.selectedActivityDriveLink.href = folderUrl || "#";
+    els.selectedActivityDriveLink.classList.toggle("hidden", !folderUrl);
+  }
 }
 
 function updateSelectedStats() {
