@@ -396,7 +396,7 @@ async function handleApi(request, response, url) {
       return;
     }
 
-    sendJson(response, 200, { config: publicGoogleDriveConfig() });
+    sendJson(response, 200, { config: publicGoogleDriveConfig(request) });
     return;
   }
 
@@ -413,7 +413,7 @@ async function handleApi(request, response, url) {
     await updateShareGalleryFromDrive(summary.folderUrl);
     sendJson(response, result.ok ? 200 : 400, {
       ...result,
-      config: publicGoogleDriveConfig(),
+      config: publicGoogleDriveConfig(request),
       googleDrive: makeGoogleDriveSummary(photos)
     });
     return;
@@ -907,7 +907,7 @@ function parseServiceAccount(value) {
   }
 }
 
-function publicGoogleDriveConfig() {
+function publicGoogleDriveConfig(request) {
   const config = getGoogleDriveConfig();
   return {
     enabled: config.enabled,
@@ -915,6 +915,7 @@ function publicGoogleDriveConfig() {
     hasClientSecret: Boolean(config.clientSecret),
     connected: config.connected,
     authMode: config.authMode,
+    redirectUri: request ? `${getOrigin(request)}/api/google-drive/oauth/callback` : "",
     folderId: config.folderId,
     folderUrl: config.folderUrl,
     hasServiceAccount: Boolean(config.serviceAccount),

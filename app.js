@@ -51,6 +51,7 @@ const els = {
   googleDriveClientIdInput: $("#googleDriveClientIdInput"),
   googleDriveClientSecretInput: $("#googleDriveClientSecretInput"),
   googleDriveFolderIdInput: $("#googleDriveFolderIdInput"),
+  googleDriveRedirectUriInput: $("#googleDriveRedirectUriInput"),
   googleDriveFolderLink: $("#googleDriveFolderLink"),
   connectGoogleDriveBtn: $("#connectGoogleDriveBtn"),
   googleDriveSetupHint: $("#googleDriveSetupHint"),
@@ -448,6 +449,10 @@ function renderGoogleDriveConfig(config) {
     els.googleDriveFolderIdInput.value = config.folderId || "";
   }
 
+  if (els.googleDriveRedirectUriInput) {
+    els.googleDriveRedirectUriInput.value = config.redirectUri || "";
+  }
+
   if (els.googleDriveFolderLink) {
     els.googleDriveFolderLink.href = config.folderUrl || "#";
     els.googleDriveFolderLink.classList.toggle("hidden", !config.folderUrl);
@@ -481,7 +486,7 @@ function renderGoogleDriveSetupHint(config = {}) {
 
   if (!config.connected) {
     els.googleDriveSetupHint.textContent =
-      "Settings saved. Click Connect Google Drive once, sign in, then come back and sync.";
+      "Settings saved. Add the Authorized redirect URI above in Google Cloud, then click Connect Google Drive.";
     return;
   }
 
