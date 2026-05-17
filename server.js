@@ -52,7 +52,7 @@ const contentTypes = {
 
 ensureDataFiles();
 
-const server = http.createServer(async (request, response) => {
+async function handleRequest(request, response) {
   try {
     const url = new URL(request.url, `http://${request.headers.host}`);
 
@@ -86,14 +86,19 @@ const server = http.createServer(async (request, response) => {
     console.error(error);
     sendJson(response, 500, { error: "Internal server error" });
   }
-});
+}
 
-server.listen(port, () => {
-  console.log(`School Face Finder is running at http://localhost:${port}`);
-  console.log(`Public URL: http://localhost:${port}/user.html`);
-  console.log(`Admin URL: http://localhost:${port}/admin.html`);
-  console.log("Default admin password is admin123. Set ADMIN_PASSWORD before production use.");
-});
+if (require.main === module) {
+  const server = http.createServer(handleRequest);
+  server.listen(port, () => {
+    console.log(`School Face Finder is running at http://localhost:${port}`);
+    console.log(`Public URL: http://localhost:${port}/user.html`);
+    console.log(`Admin URL: http://localhost:${port}/admin.html`);
+    console.log("Default admin password is admin123. Set ADMIN_PASSWORD before production use.");
+  });
+}
+
+module.exports = { handleRequest };
 
 function ensureDataFiles() {
   fs.mkdirSync(path.join(uploadDir, defaultActivity.slug), { recursive: true });

@@ -3,12 +3,17 @@
   "version": "1.0.0",
   "private": true,
   "type": "commonjs",
+  "main": "firebase-functions.js",
   "description": "School Face Finder web app with a Node.js backend.",
   "scripts": {
     "start": "node server.js",
-    "check": "node --check server.js && node --check app.js"
+    "check": "node --check server.js && node --check app.js && node --check firebase-functions.js"
   },
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "firebase": "^12.13.0",
+    "firebase-functions": "^5.1.1"
   }
 }

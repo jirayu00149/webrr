@@ -6,3 +6,5 @@ data/google-drive-config.json
 data/uploads/
 node_modules/
 .env
+.env.*
+firebase-debug.log
