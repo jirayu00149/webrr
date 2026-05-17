@@ -16,6 +16,7 @@ const photosFile = path.join(dataDir, "photos.json");
 const activitiesFile = path.join(dataDir, "activities.json");
 const shareFile = path.join(dataDir, "share.json");
 const googlePhotosConfigFile = path.join(root, "googlePhotosConfig.json");
+const googleDriveConfigFile = path.join(root, "googleDriveConfig.json");
 const googlePhotosRuntimeConfigFile = path.join(dataDir, "google-photos-config.json");
 const googlePhotosTokenFile = path.join(dataDir, "google-photos-token.json");
 const googleDriveRuntimeConfigFile = path.join(dataDir, "google-drive-config.json");
@@ -830,34 +831,43 @@ function boolFrom(value, fallback) {
 }
 
 function getGoogleDriveConfig() {
+  const fileConfig = readJsonFileSync(googleDriveConfigFile);
   const runtimeConfig = readJsonFileSync(googleDriveRuntimeConfigFile);
   const clientId =
     process.env.GOOGLE_DRIVE_CLIENT_ID ||
     process.env.GOOGLE_CLIENT_ID ||
     runtimeConfig.clientId ||
+    fileConfig.clientId ||
     "";
   const clientSecret =
     process.env.GOOGLE_DRIVE_CLIENT_SECRET ||
     process.env.GOOGLE_CLIENT_SECRET ||
     runtimeConfig.clientSecret ||
+    fileConfig.clientSecret ||
     "";
   const refreshToken =
     process.env.GOOGLE_DRIVE_REFRESH_TOKEN ||
     process.env.GOOGLE_REFRESH_TOKEN ||
     runtimeConfig.refreshToken ||
     runtimeConfig.refresh_token ||
+    fileConfig.refreshToken ||
+    fileConfig.refresh_token ||
     "";
   const serviceAccount = parseServiceAccount(
     process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON ||
       process.env.GOOGLE_SERVICE_ACCOUNT_JSON ||
       runtimeConfig.serviceAccountJson ||
       runtimeConfig.serviceAccount ||
+      fileConfig.serviceAccountJson ||
+      fileConfig.serviceAccount ||
       null
   );
   const folderId = extractGoogleDriveFolderId(
     process.env.GOOGLE_DRIVE_FOLDER_ID ||
       runtimeConfig.folderId ||
       runtimeConfig.folderUrl ||
+      fileConfig.folderId ||
+      fileConfig.folderUrl ||
       ""
   );
   const enabled = boolFrom(
@@ -914,7 +924,8 @@ function publicGoogleDriveConfig() {
       Boolean(process.env.GOOGLE_DRIVE_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET) ||
       Boolean(process.env.GOOGLE_DRIVE_REFRESH_TOKEN || process.env.GOOGLE_REFRESH_TOKEN) ||
       Boolean(process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON || process.env.GOOGLE_SERVICE_ACCOUNT_JSON) ||
-      Boolean(process.env.GOOGLE_DRIVE_FOLDER_ID)
+      Boolean(process.env.GOOGLE_DRIVE_FOLDER_ID) ||
+      Boolean(readJsonFileSync(googleDriveConfigFile).clientId)
   };
 }
 
