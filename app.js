@@ -120,6 +120,7 @@ function bindEvents() {
 
   els.activityFilter?.addEventListener("change", () => {
     updateSelectedStats();
+    renderUserSaveLink();
     updateSearchButton();
   });
 
@@ -419,8 +420,23 @@ function renderUserSaveLink() {
     return;
   }
 
-  els.userSaveLink.href = galleryLink || "#";
-  els.userSaveLink.classList.toggle("hidden", !galleryLink);
+  const selectedActivity = getSelectedFilterActivity();
+  const selectedLink = selectedActivity?.googleDriveFolderUrl || "";
+  const link = selectedLink || galleryLink || "";
+
+  els.userSaveLink.href = link || "#";
+  els.userSaveLink.textContent = selectedLink
+    ? `Open ${selectedActivity.name} in Google Drive`
+    : "Open Google Drive folder";
+  els.userSaveLink.classList.toggle("hidden", !link);
+}
+
+function getSelectedFilterActivity() {
+  const activityId = els.activityFilter?.value || "all";
+  if (activityId === "all") {
+    return null;
+  }
+  return activities.find((activity) => activity.id === activityId) || null;
 }
 
 async function loadGoogleDriveConfig() {
@@ -993,7 +1009,9 @@ async function searchMatches() {
   });
 
   currentStats = searchBody.stats || currentStats;
-  galleryLink = searchBody.galleryUrl || galleryLink || "";
+  if (!getSelectedFilterActivity()?.googleDriveFolderUrl) {
+    galleryLink = searchBody.galleryUrl || galleryLink || "";
+  }
   renderUserSaveLink();
   if (els.photoCount) {
     els.photoCount.textContent = currentStats.photos;

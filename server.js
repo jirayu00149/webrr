@@ -159,6 +159,7 @@ async function handleApi(request, response, url) {
     }
 
     const photos = await readPhotos();
+    const activities = await readActivities();
     const searchablePhotos = activityId
       ? photos.filter((photo) => photo.activityId === activityId)
       : photos;
@@ -166,10 +167,13 @@ async function handleApi(request, response, url) {
       .flatMap((photo) => findBestMatch(photo, descriptor, threshold))
       .sort((a, b) => a.distance - b.distance);
     const shareState = await readShareState();
+    const selectedActivity = activityId
+      ? activities.find((activity) => activity.id === activityId)
+      : null;
 
     sendJson(response, 200, {
       matches,
-      galleryUrl: shareState.galleryUrl || "",
+      galleryUrl: selectedActivity?.googleDriveFolderUrl || shareState.galleryUrl || "",
       stats: makeStats(searchablePhotos)
     });
     return;
