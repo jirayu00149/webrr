@@ -53,6 +53,7 @@ const els = {
   googleDriveFolderIdInput: $("#googleDriveFolderIdInput"),
   googleDriveFolderLink: $("#googleDriveFolderLink"),
   connectGoogleDriveBtn: $("#connectGoogleDriveBtn"),
+  googleDriveSetupHint: $("#googleDriveSetupHint"),
   saveGoogleDriveConfigBtn: $("#saveGoogleDriveConfigBtn")
 };
 
@@ -458,6 +459,33 @@ function renderGoogleDriveConfig(config) {
       !config.clientId || !config.hasClientSecret || !config.folderId || config.connected
     );
   }
+
+  renderGoogleDriveSetupHint(config);
+}
+
+function renderGoogleDriveSetupHint(config = {}) {
+  if (!els.googleDriveSetupHint) {
+    return;
+  }
+
+  const missing = [];
+  if (!config.clientId) missing.push("Client ID");
+  if (!config.hasClientSecret) missing.push("Client Secret");
+  if (!config.folderId) missing.push("Drive folder");
+
+  if (missing.length) {
+    els.googleDriveSetupHint.textContent =
+      `Missing on this Render server: ${missing.join(", ")}. Paste the real values here and click Save Drive.`;
+    return;
+  }
+
+  if (!config.connected) {
+    els.googleDriveSetupHint.textContent =
+      "Settings saved. Click Connect Google Drive once, sign in, then come back and sync.";
+    return;
+  }
+
+  els.googleDriveSetupHint.textContent = "Google Drive is connected.";
 }
 
 async function saveGoogleDriveConfig() {

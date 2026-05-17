@@ -674,6 +674,17 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.drive-setup-hint {
+  margin: 0;
+  border: 1px solid rgba(226, 157, 67, 0.35);
+  border-radius: var(--radius);
+  background: #fff8ec;
+  color: #6c4300;
+  padding: 10px 12px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
 .google-redirect-note code {
   color: var(--ink);
   font-weight: 900;
