@@ -7,6 +7,5 @@ data/uploads/
 node_modules/
 .env
 .env.*
-firebase-debug.log
 .dev.vars
 .wrangler/

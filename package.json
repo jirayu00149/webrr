@@ -3,19 +3,15 @@
   "version": "1.0.0",
   "private": true,
   "type": "commonjs",
-  "main": "firebase-functions.js",
+  "main": "server.js",
   "description": "School Face Finder web app with a Node.js backend.",
   "scripts": {
     "start": "node server.js",
-    "check": "node --check server.js && node --check app.js && node --check firebase-functions.js && node --check cloudflare-worker.mjs",
+    "check": "node --check server.js && node --check app.js && node --check cloudflare-worker.mjs",
     "cf:dev": "wrangler dev",
     "cf:deploy": "wrangler deploy"
   },
   "engines": {
     "node": ">=20"
-  },
-  "dependencies": {
-    "firebase": "^12.13.0",
-    "firebase-functions": "^5.1.1"
   }
 }
