@@ -499,12 +499,16 @@ async function saveGoogleDriveConfig() {
   }
 
   const payload = {
-    clientId: els.googleDriveClientIdInput?.value.trim() || "",
-    clientSecret: els.googleDriveClientSecretInput?.value.trim() || "",
-    serviceAccountJson: els.googleDriveServiceAccountInput?.value.trim() || "",
     folderId: els.googleDriveFolderIdInput?.value.trim() || "",
     enabled: true
   };
+  const clientId = els.googleDriveClientIdInput?.value.trim() || "";
+  const clientSecret = els.googleDriveClientSecretInput?.value.trim() || "";
+  const serviceAccountJson = els.googleDriveServiceAccountInput?.value.trim() || "";
+
+  if (clientId) payload.clientId = clientId;
+  if (clientSecret) payload.clientSecret = clientSecret;
+  if (serviceAccountJson) payload.serviceAccountJson = serviceAccountJson;
 
   els.saveGoogleDriveConfigBtn.disabled = true;
   els.saveGoogleDriveConfigBtn.textContent = "กำลังตั้งค่า...";
