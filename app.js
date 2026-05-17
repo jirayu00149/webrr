@@ -173,6 +173,11 @@ function bindEvents() {
   els.exportBtn?.addEventListener("click", exportResults);
   els.googleDriveSyncBtn?.addEventListener("click", syncGoogleDriveBacklog);
   els.saveGoogleDriveConfigBtn?.addEventListener("click", saveGoogleDriveConfig);
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeImageViewer();
+    }
+  });
 }
 
 async function handleLogin(event) {
@@ -723,6 +728,7 @@ function createAdminPhotoCard(photo) {
 
   image.src = photo.imageUrl;
   image.alt = photo.name;
+  addImageControls(media, image, photo);
   title.textContent = photo.name;
   meta.textContent = `${photo.activityName || "กิจกรรม"} · ${photo.facesCount || 0} ใบหน้า`;
   deleteButton.type = "button";
@@ -1050,6 +1056,7 @@ function renderResults(results) {
     image.src = result.photo.imageUrl;
     image.alt = result.photo.name;
     image.onload = () => drawFaceBox(canvas, image, result.face.box);
+    addImageControls(card.querySelector(".image-wrap"), image, result.photo);
 
     title.textContent = result.photo.name;
     meta.textContent = `${result.photo.activityName || "กิจกรรม"} · ระยะ ${result.distance.toFixed(
@@ -1058,6 +1065,104 @@ function renderResults(results) {
 
     els.resultsGrid.append(card);
   }
+}
+
+function addImageControls(container, image, photo) {
+  if (!container || !image || !photo?.imageUrl) {
+    return;
+  }
+
+  container.classList.add("interactive-image");
+  image.tabIndex = 0;
+  image.addEventListener("click", () => openImageViewer(photo.imageUrl, photo.name));
+  image.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openImageViewer(photo.imageUrl, photo.name);
+    }
+  });
+
+  const downloadButton = document.createElement("button");
+  downloadButton.className = "image-action-button image-download-button";
+  downloadButton.type = "button";
+  downloadButton.textContent = "โหลด";
+  downloadButton.setAttribute("aria-label", `Download ${photo.name || "photo"}`);
+  downloadButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    downloadImage(photo.imageUrl, photo.name);
+  });
+  container.append(downloadButton);
+}
+
+function openImageViewer(src, title = "") {
+  const viewer = ensureImageViewer();
+  const image = viewer.querySelector("img");
+  const caption = viewer.querySelector(".image-viewer-caption");
+  const downloadButton = viewer.querySelector(".image-viewer-download");
+
+  image.src = src;
+  image.alt = title;
+  caption.textContent = title || "Photo";
+  downloadButton.onclick = () => downloadImage(src, title);
+  viewer.classList.remove("hidden");
+  document.body.classList.add("viewer-open");
+  viewer.querySelector(".image-viewer-close")?.focus();
+}
+
+function closeImageViewer() {
+  const viewer = document.querySelector(".image-viewer");
+  if (!viewer || viewer.classList.contains("hidden")) {
+    return;
+  }
+
+  viewer.classList.add("hidden");
+  document.body.classList.remove("viewer-open");
+}
+
+function ensureImageViewer() {
+  let viewer = document.querySelector(".image-viewer");
+  if (viewer) {
+    return viewer;
+  }
+
+  viewer = document.createElement("div");
+  viewer.className = "image-viewer hidden";
+  viewer.innerHTML = `
+    <div class="image-viewer-backdrop" data-close-image-viewer></div>
+    <figure class="image-viewer-panel">
+      <div class="image-viewer-toolbar">
+        <figcaption class="image-viewer-caption"></figcaption>
+        <button class="secondary-button small-button image-viewer-download" type="button">โหลด</button>
+        <button class="secondary-button small-button image-viewer-close" type="button" aria-label="Close">ปิด</button>
+      </div>
+      <img alt="" />
+    </figure>
+  `;
+  viewer.addEventListener("click", (event) => {
+    if (event.target.matches("[data-close-image-viewer], .image-viewer-close")) {
+      closeImageViewer();
+    }
+  });
+  document.body.append(viewer);
+  return viewer;
+}
+
+function downloadImage(src, name = "") {
+  const link = document.createElement("a");
+  link.href = src;
+  link.download = makeDownloadFileName(name || src);
+  document.body.append(link);
+  link.click();
+  link.remove();
+}
+
+function makeDownloadFileName(name) {
+  const fileName = String(name || "photo.jpg")
+    .split(/[\\/]/)
+    .pop()
+    .replace(/[<>:"|?*]+/g, "-")
+    .trim();
+  return fileName || "photo.jpg";
 }
 
 function drawFaceBox(canvas, image, box) {
