@@ -7,7 +7,9 @@
   "description": "School Face Finder web app with a Node.js backend.",
   "scripts": {
     "start": "node server.js",
-    "check": "node --check server.js && node --check app.js && node --check firebase-functions.js"
+    "check": "node --check server.js && node --check app.js && node --check firebase-functions.js && node --check cloudflare-worker.mjs",
+    "cf:dev": "wrangler dev",
+    "cf:deploy": "wrangler deploy"
   },
   "engines": {
     "node": ">=20"
