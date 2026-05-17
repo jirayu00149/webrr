@@ -571,6 +571,39 @@ async function syncGoogleDriveBacklog() {
   }
 }
 
+function renderGoogleDriveStatus() {
+  if (!els.googleDriveState) {
+    return;
+  }
+
+  const status = googleDriveStatus || { state: "loading" };
+  const counts = Number.isFinite(status.total)
+    ? ` Saved ${status.saved}/${status.total} photos`
+    : "";
+  const failed = status.failed ? `, failed ${status.failed}` : "";
+  const messages = {
+    ready: `Google Drive is ready.${counts}${failed}`,
+    not_configured: "Google Drive is not configured: add Client ID, Client Secret, and one Drive folder.",
+    not_connected: "Drive settings are saved. Click Connect Google Drive once.",
+    disabled: "Google Drive sync is disabled.",
+    error: "Could not read Google Drive status.",
+    loading: "Checking Google Drive status."
+  };
+
+  els.googleDriveState.textContent = messages[status.state] || messages.loading;
+
+  if (els.googleDriveSyncBtn) {
+    els.googleDriveSyncBtn.disabled =
+      status.state !== "ready" || !status.unsynced || status.unsynced < 1;
+    els.googleDriveSyncBtn.textContent =
+      status.state === "not_configured" || status.state === "not_connected"
+        ? "Set up Google Drive first"
+        : status.unsynced
+          ? `Sync Pending Photos (${status.unsynced})`
+          : "Sync Pending Photos";
+  }
+}
+
 async function loadAdminPhotos() {
   if (!els.adminPhotoGrid) {
     return;
