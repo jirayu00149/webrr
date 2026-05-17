@@ -6,7 +6,7 @@ exports.app = onRequest(
     region: "asia-southeast1",
     memory: "1GiB",
     timeoutSeconds: 540,
-    minInstances: 1
+    minInstances: 0
   },
   handleRequest
 );

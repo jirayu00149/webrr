@@ -46,6 +46,6 @@ firebase deploy
 
 ## Notes
 
-- `minInstances: 1` is enabled in `firebase-functions.js` to reduce cold starts and keep the server warm. This can create Firebase charges.
+- `minInstances: 0` is used in `firebase-functions.js` to reduce fixed cost. The first request after inactivity can still have a cold start.
 - The current app still stores metadata in local JSON files under `data/`. Cloud Functions storage is not a real database, so for production the next step should be moving `activities`, `photos`, and `share` data to Firestore.
 - Google Drive Client Secrets must stay in Firebase/Google settings, not in public HTML or JavaScript files.
