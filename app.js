@@ -220,7 +220,14 @@ async function handleCreateActivity(event) {
       els.activitySelect.value = body.activity.id;
     }
     await loadAdminPhotos();
-    setStatus(`สร้างโฟลเดอร์กิจกรรม “${name}” แล้ว พร้อมอัปโหลดรูป`);
+    if (body.activity?.googleDriveFolderUrl) {
+      setStatus(`Created "${name}" and its Google Drive folder.`);
+    } else if (body.activity?.googleDriveFolderError) {
+      setStatus(`Created "${name}", but Drive folder failed: ${body.activity.googleDriveFolderError}`);
+    } else {
+      setStatus(`Created "${name}". Connect Google Drive to create Drive folders automatically.`);
+    }
+    return;
   } catch (error) {
     if (error.message === "UNAUTHORIZED") {
       window.location.href = "/admin.html";

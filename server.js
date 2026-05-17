@@ -514,6 +514,7 @@ async function createActivity(name) {
   await fsp.mkdir(path.join(uploadDir, slug), { recursive: true });
   activities.push(activity);
   await writeActivities(activities);
+  await createGoogleDriveFolderForActivity(activity, activities);
   return activity;
 }
 
@@ -1315,6 +1316,51 @@ async function getGoogleDrivePhotoFolder(photo, config, accessToken) {
     id: folderId,
     url: folderUrl
   };
+}
+
+async function createGoogleDriveFolderForActivity(activity, activities) {
+  const config = getGoogleDriveConfig();
+
+  if (!activity || activity.googleDriveFolderId || !config.enabled || !config.configured) {
+    return {
+      status: "skipped"
+    };
+  }
+
+  try {
+    const accessToken = await getGoogleDriveAccessToken(config);
+    const folderName = sanitizeGoogleDriveFolderName(activity.name || "activity");
+    const folder = await createGoogleDriveFolder(accessToken, {
+      name: folderName,
+      parentId: config.folderId
+    });
+    const folderId = folder.id || "";
+    const folderUrl = folder.webViewLink || `https://drive.google.com/drive/folders/${folderId}`;
+
+    if (!folderId) {
+      throw new Error("Google Drive did not create an activity folder.");
+    }
+
+    activity.googleDriveFolderId = folderId;
+    activity.googleDriveFolderUrl = folderUrl;
+    delete activity.googleDriveFolderError;
+    await writeActivities(activities);
+    await updateShareGalleryFromDrive(config.folderUrl);
+
+    return {
+      status: "saved",
+      folderId,
+      folderUrl
+    };
+  } catch (error) {
+    console.error("Google Drive activity folder creation failed:", error);
+    activity.googleDriveFolderError = sanitizeGoogleError(error);
+    await writeActivities(activities);
+    return {
+      status: "failed",
+      error: activity.googleDriveFolderError
+    };
+  }
 }
 
 function sanitizeGoogleDriveFolderName(name) {
