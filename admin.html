@@ -21,7 +21,7 @@
     <header class="site-header">
       <div class="app-shell nav-bar admin-nav">
         <a class="brand" href="admin.html" aria-label="School Face Finder Admin">
-          <span class="brand-mark">SF</span>
+          <span class="brand-mark brand-logo"><img src="/assets/school-logo.jpg" alt="" /></span>
           <span>
             <strong>School Face Finder</strong>
             <small>Admin upload</small>
@@ -178,24 +178,6 @@
           </div>
           <div class="google-config-form">
             <label>
-              Google Drive Client ID
-              <input
-                id="googleDriveClientIdInput"
-                type="text"
-                autocomplete="off"
-                placeholder="1234567890-xxxx.apps.googleusercontent.com"
-              />
-            </label>
-            <label>
-              Google Drive Client Secret
-              <input
-                id="googleDriveClientSecretInput"
-                type="password"
-                autocomplete="off"
-                placeholder="Leave blank if already saved"
-              />
-            </label>
-            <label>
               Main Google Drive Folder ID or URL
               <input
                 id="googleDriveFolderIdInput"
@@ -204,15 +186,36 @@
                 placeholder="https://drive.google.com/drive/folders/..."
               />
             </label>
-            <label>
-              Authorized redirect URI
-              <input
-                id="googleDriveRedirectUriInput"
-                type="text"
-                readonly
-                value=""
-              />
-            </label>
+            <details class="advanced-drive-settings">
+              <summary>Google OAuth settings</summary>
+              <label>
+                Google Drive Client ID
+                <input
+                  id="googleDriveClientIdInput"
+                  type="text"
+                  autocomplete="off"
+                  placeholder="Saved OAuth Client ID"
+                />
+              </label>
+              <label>
+                Google Drive Client Secret
+                <input
+                  id="googleDriveClientSecretInput"
+                  type="password"
+                  autocomplete="off"
+                  placeholder="Client secret saved. Leave blank to keep it."
+                />
+              </label>
+              <label>
+                Authorized redirect URI
+                <input
+                  id="googleDriveRedirectUriInput"
+                  type="text"
+                  readonly
+                  value=""
+                />
+              </label>
+            </details>
             <div class="button-row">
               <button class="secondary-button small-button" id="saveGoogleDriveConfigBtn" type="button">
                 Save Drive
@@ -236,8 +239,8 @@
             </div>
             <p class="small-note drive-setup-hint" id="googleDriveSetupHint"></p>
             <p class="small-note google-redirect-note">
-              For personal Gmail, enter the real Client ID, Client Secret, and one Drive
-              folder on this Render page, then click Save Drive and Connect Google Drive.
+              Use the saved Google OAuth app every time. For a new event, change only
+              the Drive folder link above, then click Save Drive.
               The app creates subfolders by activity name.
             </p>
           </div>

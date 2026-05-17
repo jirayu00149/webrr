@@ -770,7 +770,10 @@ async function updateGooglePhotosRuntimeConfig(body) {
   }
 
   if (Object.prototype.hasOwnProperty.call(body, "clientId")) {
-    next.clientId = sanitizeConfigValue(body.clientId);
+    const clientId = sanitizeConfigValue(body.clientId);
+    if (clientId) {
+      next.clientId = clientId;
+    }
   }
 
   if (Object.prototype.hasOwnProperty.call(body, "clientSecret")) {
@@ -941,7 +944,10 @@ async function updateGoogleDriveRuntimeConfig(body) {
   }
 
   if (Object.prototype.hasOwnProperty.call(body, "clientId")) {
-    next.clientId = sanitizeConfigValue(body.clientId);
+    const clientId = sanitizeConfigValue(body.clientId);
+    if (clientId) {
+      next.clientId = clientId;
+    }
   }
 
   if (Object.prototype.hasOwnProperty.call(body, "clientSecret")) {

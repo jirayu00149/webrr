@@ -650,6 +650,19 @@ h2 {
   font-weight: 900;
 }
 
+.brand-logo {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: #fff;
+}
+
+.brand-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .google-config-form input,
 .google-config-form textarea {
   width: 100%;
@@ -667,6 +680,29 @@ h2 {
   padding-top: 10px;
   font-family: Consolas, "Courier New", monospace;
   resize: vertical;
+}
+
+.advanced-drive-settings {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #f8fafc;
+  padding: 10px 12px;
+}
+
+.advanced-drive-settings summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.advanced-drive-settings[open] {
+  padding-bottom: 12px;
+}
+
+.advanced-drive-settings[open] summary {
+  margin-bottom: 10px;
 }
 
 .google-redirect-note {
