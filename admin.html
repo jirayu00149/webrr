@@ -41,18 +41,18 @@
       <section class="page-hero admin-upload-hero">
         <div>
           <p class="eyebrow">Admin only</p>
-          <h1>UP รูป</h1>
+          <h1>จัดการรูปกิจกรรม</h1>
           <p>
-            Create an activity folder, upload photos, and let the server sync them
-            to Google Drive. The app creates one Drive subfolder per activity.
+            สร้างโฟลเดอร์กิจกรรม อัปโหลดรูป และให้ระบบจัดเก็บลง Google Drive
+            โดยแยกโฟลเดอร์ย่อยให้อัตโนมัติตามแต่ละกิจกรรม
           </p>
         </div>
       </section>
 
       <section class="notice">
         <div>
-          <h2>Permission Check</h2>
-          <p>Use only photos that the school has permission to store and search.</p>
+          <h2>ตรวจสิทธิ์ก่อนอัปโหลด</h2>
+          <p>ใช้เฉพาะรูปที่โรงเรียนได้รับอนุญาตให้จัดเก็บและค้นหาแล้วเท่านั้น</p>
         </div>
       </section>
 
@@ -60,28 +60,28 @@
         <div class="panel-header">
           <div>
             <p class="eyebrow">Activity folders</p>
-            <h2>สร้างโฟลเดอร์</h2>
+            <h2>โฟลเดอร์กิจกรรม</h2>
           </div>
         </div>
 
         <form class="activity-form" id="activityForm">
-          <label for="activityName">ชื่อโฟลเดอร์ใหม่</label>
+          <label for="activityName">ชื่อกิจกรรมใหม่</label>
           <div class="inline-form">
             <input
               id="activityName"
               type="text"
               maxlength="120"
-              placeholder="Sports Day 2026, Teacher Day, Field Trip"
+              placeholder="เช่น กีฬาสี 2569, วันไหว้ครู, ทัศนศึกษา"
             />
-            <button class="secondary-button" type="submit">Create Folder</button>
+            <button class="secondary-button" type="submit">สร้างโฟลเดอร์</button>
           </div>
         </form>
 
-        <label class="field-label" for="activitySelect">เลือกโฟลเดอร์ที่จะอัพโหลด</label>
+        <label class="field-label" for="activitySelect">เลือกโฟลเดอร์สำหรับอัปโหลด</label>
         <div class="inline-form">
           <select id="activitySelect" class="select-input"></select>
           <button class="ghost-button" id="deleteActivityBtn" type="button" disabled>
-            Delete Folder
+            ลบโฟลเดอร์
           </button>
         </div>
 
@@ -104,12 +104,12 @@
             </svg>
           </span>
           <strong>กดเพิ่มรูปภาพ</strong>
-          <span>The server will detect faces, save photos locally, and sync to Drive when configured.</span>
+          <span>ระบบจะตรวจจับใบหน้าและจัดเก็บรูปลง Google Drive เมื่อเชื่อมต่อ Drive แล้ว</span>
         </label>
 
         <div class="upload-actions">
           <button class="primary-button" id="savePhotosBtn" type="button">
-            Choose Photos
+            เลือกรูปภาพ
           </button>
         </div>
 
@@ -120,11 +120,11 @@
         <div class="panel-header">
           <div>
             <p class="eyebrow">Share link</p>
-            <h2>Main Link for Users</h2>
+            <h2>ลิงก์รวมสำหรับผู้ใช้</h2>
           </div>
         </div>
         <label class="field-label" for="galleryLinkInput">
-          Optional custom album/folder link
+          ลิงก์ Drive หรืออัลบั้มรวม
         </label>
         <div class="inline-form">
           <input
@@ -133,7 +133,7 @@
             placeholder="https://drive.google.com/drive/folders/..."
           />
           <button class="secondary-button" id="saveGalleryLinkBtn" type="button">
-            Save Main Link
+            บันทึกลิงก์รวม
           </button>
         </div>
         <div class="button-row gallery-link-actions">
@@ -144,9 +144,9 @@
             target="_blank"
             rel="noopener"
           >
-            Open Main Link
+            เปิดลิงก์รวม
           </a>
-          <p class="small-note" id="galleryLinkState">No main link has been set</p>
+          <p class="small-note" id="galleryLinkState">ยังไม่ได้ตั้งค่าลิงก์รวม</p>
         </div>
       </section>
 
@@ -154,31 +154,31 @@
         <div class="panel-header">
           <div>
             <p class="eyebrow">Photo management</p>
-            <h2>Manage Web Photos</h2>
+            <h2>รูปภาพในระบบ</h2>
           </div>
         </div>
         <div class="empty-state" id="adminPhotoEmpty">
-          <strong>No photos in this folder yet</strong>
-          <span>Upload photos first, then delete buttons will appear here.</span>
+          <strong>ยังไม่มีรูปในโฟลเดอร์นี้</strong>
+          <span>เมื่ออัปโหลดแล้ว รูปและปุ่มจัดการจะแสดงที่นี่</span>
         </div>
         <div class="admin-photo-grid" id="adminPhotoGrid"></div>
       </section>
 
       <section class="panel status-card admin-status" aria-live="polite">
         <p class="eyebrow">Status</p>
-        <h2>Upload Status</h2>
-        <p id="statusText">Waiting for face detection models</p>
+        <h2>สถานะระบบ</h2>
+        <p id="statusText">กำลังเตรียมโมเดลตรวจจับใบหน้า</p>
         <div class="sync-status">
           <p class="eyebrow">Google Drive</p>
           <p class="small-note" id="googleDriveState">Checking Google Drive status</p>
           <div class="button-row">
             <button class="secondary-button small-button" id="googleDriveSyncBtn" type="button" disabled>
-              Sync Pending Photos
+              ซิงค์รูปที่ค้าง
             </button>
           </div>
           <div class="google-config-form">
             <label>
-              Main Google Drive Folder ID or URL
+              ลิงก์โฟลเดอร์หลัก Google Drive
               <input
                 id="googleDriveFolderIdInput"
                 type="text"
@@ -187,7 +187,7 @@
               />
             </label>
             <details class="advanced-drive-settings">
-              <summary>Google OAuth settings</summary>
+              <summary>ตั้งค่า Google OAuth</summary>
               <label>
                 Google Drive Client ID
                 <input
@@ -218,14 +218,14 @@
             </details>
             <div class="button-row">
               <button class="secondary-button small-button" id="saveGoogleDriveConfigBtn" type="button">
-                Save Drive
+                บันทึก Drive
               </button>
               <a
                 class="secondary-button small-button hidden"
                 id="connectGoogleDriveBtn"
                 href="/api/admin/google-drive/connect"
               >
-                Connect Google Drive
+                เชื่อมต่อ Google Drive
               </a>
               <a
                 class="secondary-button small-button hidden"
@@ -234,14 +234,13 @@
                 target="_blank"
                 rel="noopener"
               >
-                Open Drive Folder
+                เปิดโฟลเดอร์ Drive
               </a>
             </div>
             <p class="small-note drive-setup-hint" id="googleDriveSetupHint"></p>
             <p class="small-note google-redirect-note">
-              Use the saved Google OAuth app every time. For a new event, change only
-              the Drive folder link above, then click Save Drive.
-              The app creates subfolders by activity name.
+              ตั้งค่า OAuth ไว้ครั้งเดียวก็ใช้ต่อได้ตลอด ถ้าเริ่มงานใหม่ให้เปลี่ยนเฉพาะ
+              ลิงก์โฟลเดอร์ Drive ด้านบนแล้วกดบันทึก ระบบจะสร้างโฟลเดอร์ย่อยตามชื่อกิจกรรม
             </p>
           </div>
         </div>
@@ -249,16 +248,16 @@
 
       <section class="panel status-card admin-status">
         <p class="eyebrow">Share link</p>
-        <h2>Random Link to Share</h2>
+        <h2>ลิงก์สุ่มสำหรับแจก</h2>
         <p class="small-note">
           <a id="shareLink" href="user.html">Creating random link</a>
         </p>
         <div class="button-row">
           <button class="secondary-button small-button" id="copyShareLinkBtn" type="button">
-            Copy Link
+            คัดลอกลิงก์
           </button>
           <button class="secondary-button small-button" id="regenerateShareLinkBtn" type="button">
-            New Random Link
+            สร้างลิงก์ใหม่
           </button>
         </div>
       </section>
