@@ -26,11 +26,11 @@ const googlePhotosScope = "https://www.googleapis.com/auth/photoslibrary.appendo
 const googleDriveScope = "https://www.googleapis.com/auth/drive.file";
 const defaultActivity = {
   id: "general",
-  name: "ทั่วไป",
+  name: "รวมกิจกรรม",
   slug: "general",
   createdAt: 0
 };
-defaultActivity.name = "ทั่วไป";
+defaultActivity.name = "รวมกิจกรรม";
 const sessions = new Set();
 let googlePhotosAccessTokenCache = { token: "", expiresAt: 0 };
 let googleDriveAccessTokenCache = { token: "", key: "", refreshToken: "", expiresAt: 0 };

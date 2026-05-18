@@ -27,10 +27,6 @@
             <small>ค้นหารูปกิจกรรมโรงเรียน</small>
           </span>
         </a>
-        <div class="model-state" id="modelState" role="status">
-          <span class="state-dot" aria-hidden="true"></span>
-          <span id="modelStateText">กำลังเตรียมโมเดล</span>
-        </div>
         <a class="secondary-button small-button" href="/admin.html">Admin</a>
       </div>
     </header>
@@ -43,16 +39,6 @@
           <p>
             เลือกกิจกรรมหรือค้นหาทุกกิจกรรม แล้วอัปโหลดรูปหน้าชัดหนึ่งรูปเพื่อค้นหารูปที่คล้าย
           </p>
-        </div>
-        <div class="stat-grid">
-          <div class="stat-card">
-            <span class="metric-label">รูปในขอบเขตที่เลือก</span>
-            <strong id="photoCount">0</strong>
-          </div>
-          <div class="stat-card">
-            <span class="metric-label">ผลค้นหาล่าสุด</span>
-            <strong id="matchCount">0</strong>
-          </div>
         </div>
       </section>
 
@@ -81,18 +67,6 @@
                 <span>ยืนยันว่าค้นหารูปของตัวเอง หรือได้รับอนุญาตแล้ว</span>
               </label>
 
-              <label class="range-row" for="thresholdInput">
-                <span>ความเข้มงวด</span>
-                <output id="thresholdValue" for="thresholdInput">0.52</output>
-              </label>
-              <input
-                id="thresholdInput"
-                type="range"
-                min="0.35"
-                max="0.65"
-                step="0.01"
-                value="0.52"
-              />
               <button class="primary-button" id="searchBtn" type="button" disabled>
                 ค้นหารูปของฉัน
               </button>
@@ -113,9 +87,6 @@
           >
             บันทึกรูปจาก Google Photos
           </a>
-          <button class="secondary-button" id="exportBtn" type="button" disabled>
-            ส่งออกผลลัพธ์ CSV
-          </button>
         </aside>
       </section>
 

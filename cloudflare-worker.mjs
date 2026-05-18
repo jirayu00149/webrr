@@ -10,7 +10,7 @@ const DRIVE_STATE_COOKIE = "sff_google_drive_state";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const DEFAULT_ACTIVITY = {
   id: "general",
-  name: "ทั่วไป",
+  name: "รวมกิจกรรม",
   slug: "general",
   createdAt: 0
 };
