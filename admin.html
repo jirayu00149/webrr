@@ -27,10 +27,6 @@
             <small>Admin upload</small>
           </span>
         </a>
-        <div class="model-state" id="modelState" role="status">
-          <span class="state-dot" aria-hidden="true"></span>
-          <span id="modelStateText">Preparing models</span>
-        </div>
         <button class="secondary-button small-button" id="logoutBtn" type="button">
           Logout
         </button>
@@ -184,87 +180,11 @@
         <p class="eyebrow">Status</p>
         <h2>สถานะระบบ</h2>
         <p id="statusText">กำลังเตรียมโมเดลตรวจจับใบหน้า</p>
-        <div class="sync-status">
-          <p class="eyebrow">Google Drive</p>
-          <p class="small-note" id="googleDriveState">Checking Google Drive status</p>
-          <div class="button-row">
-            <button class="secondary-button small-button" id="googleDriveSyncBtn" type="button" disabled>
-              ซิงค์รูปที่ค้าง
-            </button>
-          </div>
-          <div class="google-config-form">
-            <label>
-              ลิงก์โฟลเดอร์หลัก Google Drive
-              <input
-                id="googleDriveFolderIdInput"
-                type="text"
-                autocomplete="off"
-                placeholder="https://drive.google.com/drive/folders/..."
-              />
-            </label>
-            <details class="advanced-drive-settings">
-              <summary>ตั้งค่า Google OAuth</summary>
-              <label>
-                Google Drive Client ID
-                <input
-                  id="googleDriveClientIdInput"
-                  type="text"
-                  autocomplete="off"
-                  placeholder="Saved OAuth Client ID"
-                />
-              </label>
-              <label>
-                Google Drive Client Secret
-                <input
-                  id="googleDriveClientSecretInput"
-                  type="password"
-                  autocomplete="off"
-                  placeholder="Client secret saved. Leave blank to keep it."
-                />
-              </label>
-              <label>
-                Authorized redirect URI
-                <input
-                  id="googleDriveRedirectUriInput"
-                  type="text"
-                  readonly
-                  value=""
-                />
-              </label>
-            </details>
-            <div class="button-row">
-              <button class="secondary-button small-button" id="saveGoogleDriveConfigBtn" type="button">
-                บันทึก Drive
-              </button>
-              <a
-                class="secondary-button small-button hidden"
-                id="connectGoogleDriveBtn"
-                href="/api/admin/google-drive/connect"
-              >
-                เชื่อมต่อ Google Drive
-              </a>
-              <a
-                class="secondary-button small-button hidden"
-                id="googleDriveFolderLink"
-                href="#"
-                target="_blank"
-                rel="noopener"
-              >
-                เปิดโฟลเดอร์ Drive
-              </a>
-            </div>
-            <p class="small-note drive-setup-hint" id="googleDriveSetupHint"></p>
-            <p class="small-note google-redirect-note">
-              ตั้งค่า OAuth ไว้ครั้งเดียวก็ใช้ต่อได้ตลอด ถ้าเริ่มงานใหม่ให้เปลี่ยนเฉพาะ
-              ลิงก์โฟลเดอร์ Drive ด้านบนแล้วกดบันทึก ระบบจะสร้างโฟลเดอร์ย่อยตามชื่อกิจกรรม
-            </p>
-          </div>
-        </div>
       </section>
 
       <section class="panel status-card admin-status">
         <p class="eyebrow">Share link</p>
-        <h2>ลิงก์สุ่มสำหรับแจก</h2>
+        <h2>ลิงก์สุ่มสำหรับแชร์</h2>
         <p class="small-note">
           <a id="shareLink" href="user.html">Creating random link</a>
         </p>
