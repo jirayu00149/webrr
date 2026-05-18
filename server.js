@@ -166,7 +166,7 @@ async function handleApi(request, response, url) {
     const photos = await readPhotos();
     const activities = await readActivities();
     const searchablePhotos = activityId
-      ? photos.filter((photo) => photo.activityId === activityId)
+      ? photos.filter((photo) => photoBelongsToActivity(photo, activityId))
       : photos;
     const matches = searchablePhotos
       .flatMap((photo) => findBestMatch(photo, descriptor, threshold))
@@ -260,9 +260,10 @@ async function handleApi(request, response, url) {
 
     const record = await saveUploadedPhoto(body, activity);
     const photos = await readPhotos();
+    const updatedActivities = await readActivities();
     sendJson(response, 201, {
       photo: adminPhoto(record),
-      activities: addActivityCounts(activities, photos),
+      activities: addActivityCounts(updatedActivities, photos),
       stats: makeStats(photos)
     });
     return;
@@ -277,7 +278,7 @@ async function handleApi(request, response, url) {
     const activityId = url.searchParams.get("activityId") || "";
     const photos = await readPhotos();
     const filteredPhotos = activityId
-      ? photos.filter((photo) => photo.activityId === activityId)
+      ? photos.filter((photo) => photoBelongsToActivity(photo, activityId))
       : photos;
     sendJson(response, 200, {
       photos: filteredPhotos
@@ -575,6 +576,13 @@ async function saveUploadedPhoto(body, activity) {
     mimeType
   });
 
+  if (!isDefaultActivityId(activity.id)) {
+    record.googleDriveAggregate = await mirrorPhotoToDefaultActivityDrive(record, imageBuffer, {
+      fileName: `all-${fileName}`,
+      mimeType
+    });
+  }
+
   photos.push(record);
   await writePhotos(photos);
   return record;
@@ -672,6 +680,11 @@ async function removePhotoFile(photo) {
   const filePath = getLocalPhotoPath(photo);
   if (filePath) {
     await fsp.unlink(filePath).catch(() => {});
+  }
+
+  await deleteGoogleDriveFile(photo.googleDrive?.fileId);
+  if (photo.googleDriveAggregate?.fileId !== photo.googleDrive?.fileId) {
+    await deleteGoogleDriveFile(photo.googleDriveAggregate?.fileId);
   }
 }
 
@@ -1134,6 +1147,33 @@ async function mirrorPhotoToGoogleDrive(photo, imageBuffer, options = {}) {
   }
 }
 
+async function mirrorPhotoToDefaultActivityDrive(photo, imageBuffer, options = {}) {
+  if (isDefaultActivityId(photo.activityId)) {
+    return null;
+  }
+
+  const activities = await readActivities();
+  const aggregateActivity = activities.find((activity) => isDefaultActivityId(activity.id));
+  if (!aggregateActivity) {
+    return {
+      status: "failed",
+      error: "Default activity folder is missing",
+      updatedAt: Date.now()
+    };
+  }
+
+  return mirrorPhotoToGoogleDrive(
+    {
+      ...photo,
+      activityId: aggregateActivity.id,
+      activityName: aggregateActivity.name,
+      activitySlug: aggregateActivity.slug
+    },
+    imageBuffer,
+    options
+  );
+}
+
 async function syncGoogleDriveBacklog() {
   const photos = await readPhotos();
   const summary = makeGoogleDriveSummary(photos);
@@ -1512,6 +1552,32 @@ async function uploadGoogleDriveFile(accessToken, options) {
     },
     body
   );
+}
+
+async function deleteGoogleDriveFile(fileId) {
+  if (!fileId) {
+    return;
+  }
+
+  const config = getGoogleDriveConfig();
+  if (!config.configured) {
+    return;
+  }
+
+  try {
+    const accessToken = await getGoogleDriveAccessToken(config);
+    await requestText(
+      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?supportsAllDrives=true`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        }
+      }
+    );
+  } catch (error) {
+    console.warn(`Could not delete Google Drive file ${fileId}: ${sanitizeGoogleError(error)}`);
+  }
 }
 
 async function updateShareGalleryFromDrive(folderUrl) {
@@ -2335,6 +2401,7 @@ function adminPhoto(photo) {
     activityName: photo.activityName,
     facesCount: photo.faces.length,
     googleDrive: publicGoogleDriveState(photo.googleDrive),
+    googleDriveAggregate: publicGoogleDriveState(photo.googleDriveAggregate),
     googlePhotos: publicGooglePhotoState(photo.googlePhotos)
   };
 }
@@ -2352,6 +2419,7 @@ function searchPhoto(photo) {
     activityName: photo.activityName,
     facesCount: photo.faces.length,
     googleDrive: publicGoogleDriveState(photo.googleDrive),
+    googleDriveAggregate: publicGoogleDriveState(photo.googleDriveAggregate),
     googlePhotos: publicGooglePhotoState(photo.googlePhotos)
   };
 }
@@ -2393,13 +2461,23 @@ function euclideanDistance(left, right) {
 
 function addActivityCounts(activities, photos) {
   return activities.map((activity) => {
-    const activityPhotos = photos.filter((photo) => photo.activityId === activity.id);
+    const activityPhotos = isDefaultActivityId(activity.id)
+      ? photos
+      : photos.filter((photo) => photo.activityId === activity.id);
     return {
       ...activity,
       photosCount: activityPhotos.length,
       facesCount: activityPhotos.reduce((total, photo) => total + photo.faces.length, 0)
     };
   });
+}
+
+function photoBelongsToActivity(photo, activityId) {
+  return !activityId || isDefaultActivityId(activityId) || photo.activityId === activityId;
+}
+
+function isDefaultActivityId(activityId) {
+  return String(activityId || "") === defaultActivity.id;
 }
 
 function makeStats(photos) {

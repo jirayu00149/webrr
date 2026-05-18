@@ -95,7 +95,7 @@ async function handleApi(request, env, url) {
     const photos = await readPhotos(env);
     const activities = await readActivities(env);
     const searchablePhotos = activityId
-      ? photos.filter((photo) => photo.activityId === activityId)
+      ? photos.filter((photo) => photoBelongsToActivity(photo, activityId))
       : photos;
     const matches = searchablePhotos
       .flatMap((photo) => findBestMatch(photo, descriptor, threshold))
@@ -229,10 +229,11 @@ async function handleApi(request, env, url) {
 
     const record = await saveUploadedPhoto(env, body, activity);
     const photos = await readPhotos(env);
+    const updatedActivities = await readActivities(env);
     return json(
       {
         photo: adminPhoto(record),
-        activities: addActivityCounts(activities, photos),
+        activities: addActivityCounts(updatedActivities, photos),
         stats: makeStats(photos)
       },
       201
@@ -244,7 +245,7 @@ async function handleApi(request, env, url) {
     const activityId = url.searchParams.get("activityId") || "";
     const photos = await readPhotos(env);
     const filteredPhotos = activityId
-      ? photos.filter((photo) => photo.activityId === activityId)
+      ? photos.filter((photo) => photoBelongsToActivity(photo, activityId))
       : photos;
     return json({
       photos: filteredPhotos
@@ -421,8 +422,16 @@ async function saveUploadedPhoto(env, body, activity) {
     mimeType
   });
 
-  if (record.googleDrive?.fileId) {
-    record.imageUrl = `/api/drive-image/${record.googleDrive.fileId}`;
+  if (!isDefaultActivityId(activity.id)) {
+    record.googleDriveAggregate = await mirrorPhotoToDefaultActivityDrive(env, record, imageBytes, {
+      fileName: `all-${fileName}`,
+      mimeType
+    });
+  }
+
+  const imageFileId = record.googleDrive?.fileId || record.googleDriveAggregate?.fileId || "";
+  if (imageFileId) {
+    record.imageUrl = `/api/drive-image/${imageFileId}`;
   } else {
     record.imageUrl = "";
   }
@@ -474,6 +483,9 @@ async function deletePhoto(env, photoId) {
 
   const [photo] = photos.splice(index, 1);
   await deleteGoogleDriveFile(env, photo.googleDrive?.fileId);
+  if (photo.googleDriveAggregate?.fileId !== photo.googleDrive?.fileId) {
+    await deleteGoogleDriveFile(env, photo.googleDriveAggregate?.fileId);
+  }
   await writeJson(env, DATA_KEYS.photos, photos);
 
   return {
@@ -509,6 +521,9 @@ async function deleteActivity(env, activityId) {
 
   for (const photo of removedPhotos) {
     await deleteGoogleDriveFile(env, photo.googleDrive?.fileId);
+    if (photo.googleDriveAggregate?.fileId !== photo.googleDrive?.fileId) {
+      await deleteGoogleDriveFile(env, photo.googleDriveAggregate?.fileId);
+    }
   }
   await deleteGoogleDriveFile(env, activity.googleDriveFolderId);
 
@@ -589,6 +604,34 @@ async function mirrorPhotoToGoogleDrive(env, photo, imageBytes, options = {}) {
       updatedAt: Date.now()
     };
   }
+}
+
+async function mirrorPhotoToDefaultActivityDrive(env, photo, imageBytes, options = {}) {
+  if (isDefaultActivityId(photo.activityId)) {
+    return null;
+  }
+
+  const activities = await readActivities(env);
+  const defaultActivity = activities.find((activity) => isDefaultActivityId(activity.id));
+  if (!defaultActivity) {
+    return {
+      status: "failed",
+      error: "Default activity folder is missing",
+      updatedAt: Date.now()
+    };
+  }
+
+  return mirrorPhotoToGoogleDrive(
+    env,
+    {
+      ...photo,
+      activityId: defaultActivity.id,
+      activityName: defaultActivity.name,
+      activitySlug: defaultActivity.slug
+    },
+    imageBytes,
+    options
+  );
 }
 
 async function getGoogleDrivePhotoFolder(env, photo, config, accessToken) {
@@ -1259,6 +1302,7 @@ function adminPhoto(photo) {
     activityName: photo.activityName,
     facesCount: Array.isArray(photo.faces) ? photo.faces.length : 0,
     googleDrive: publicGoogleDriveState(photo.googleDrive),
+    googleDriveAggregate: publicGoogleDriveState(photo.googleDriveAggregate),
     googlePhotos: publicGooglePhotoState(photo.googlePhotos)
   };
 }
@@ -1336,13 +1380,23 @@ function euclideanDistance(left, right) {
 
 function addActivityCounts(activities, photos) {
   return activities.map((activity) => {
-    const activityPhotos = photos.filter((photo) => photo.activityId === activity.id);
+    const activityPhotos = isDefaultActivityId(activity.id)
+      ? photos
+      : photos.filter((photo) => photo.activityId === activity.id);
     return {
       ...activity,
       photosCount: activityPhotos.length,
       facesCount: activityPhotos.reduce((total, photo) => total + (photo.faces || []).length, 0)
     };
   });
+}
+
+function photoBelongsToActivity(photo, activityId) {
+  return !activityId || isDefaultActivityId(activityId) || photo.activityId === activityId;
+}
+
+function isDefaultActivityId(activityId) {
+  return String(activityId || "") === DEFAULT_ACTIVITY.id;
 }
 
 function makeStats(photos) {
