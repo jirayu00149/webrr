@@ -451,7 +451,7 @@ function getSelectedFilterActivity() {
 }
 
 async function loadGoogleDriveConfig() {
-  if (!els.googleDriveClientIdInput && !els.googleDriveServiceAccountInput) {
+  if (!els.googleDriveClientIdInput && !els.googleDriveServiceAccountInput && !els.connectGoogleDriveBtn) {
     return;
   }
 
@@ -498,6 +498,7 @@ function renderGoogleDriveConfig(config) {
   }
 
   if (els.connectGoogleDriveBtn) {
+    els.connectGoogleDriveBtn.href = "/api/admin/google-drive/connect";
     els.connectGoogleDriveBtn.classList.toggle(
       "hidden",
       !config.clientId || !config.hasClientSecret || !config.folderId || config.connected

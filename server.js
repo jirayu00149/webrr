@@ -395,6 +395,7 @@ async function handleApi(request, response, url) {
       return;
     }
 
+    await syncGoogleDriveActivityFolders();
     await ensureDefaultActivityDriveFolder();
     const photos = await readPhotos();
     const summary = makeGoogleDriveSummary(photos);
@@ -421,6 +422,7 @@ async function handleApi(request, response, url) {
 
     const body = await readJsonBody(request, 256 * 1024);
     const result = await updateGoogleDriveRuntimeConfig(body);
+    await syncGoogleDriveActivityFolders();
     await ensureDefaultActivityDriveFolder();
     const photos = await readPhotos();
     const summary = makeGoogleDriveSummary(photos);
@@ -1438,6 +1440,134 @@ async function createGoogleDriveFolderForActivity(activity, activities) {
       error: activity.googleDriveFolderError
     };
   }
+}
+
+async function syncGoogleDriveActivityFolders() {
+  const config = getGoogleDriveConfig();
+  if (!config.enabled || !config.configured) {
+    return { status: "skipped", imported: 0, updated: 0 };
+  }
+
+  try {
+    const accessToken = await getGoogleDriveAccessToken(config);
+    const driveFolders = await listGoogleDriveChildFolders(accessToken, config.folderId);
+    const activities = await readActivities();
+    const result = mergeGoogleDriveFoldersIntoActivities(activities, driveFolders);
+
+    if (result.changed) {
+      await writeActivities(result.activities);
+    }
+
+    return {
+      status: "saved",
+      imported: result.imported,
+      updated: result.updated
+    };
+  } catch (error) {
+    console.warn(`Could not import Google Drive folders: ${sanitizeGoogleError(error)}`);
+    return {
+      status: "failed",
+      imported: 0,
+      updated: 0,
+      error: sanitizeGoogleError(error)
+    };
+  }
+}
+
+function mergeGoogleDriveFoldersIntoActivities(activities, driveFolders) {
+  const next = ensureDefaultActivity(activities).activities.map((activity) => ({ ...activity }));
+  let changed = false;
+  let imported = 0;
+  let updated = 0;
+
+  for (const folder of driveFolders) {
+    const folderId = String(folder.id || "");
+    const folderName = sanitizeText(folder.name, "");
+    if (!folderId || !folderName) {
+      continue;
+    }
+
+    const folderUrl = folder.webViewLink || `https://drive.google.com/drive/folders/${folderId}`;
+    let activity =
+      next.find((item) => item.googleDriveFolderId === folderId) ||
+      (isDefaultActivityName(folderName)
+        ? next.find((item) => isDefaultActivityId(item.id))
+        : null) ||
+      next.find((item) => normalizeActivityName(item.name) === normalizeActivityName(folderName));
+
+    if (activity) {
+      if (
+        activity.googleDriveFolderId !== folderId ||
+        activity.googleDriveFolderUrl !== folderUrl ||
+        activity.googleDriveFolderError
+      ) {
+        activity.googleDriveFolderId = folderId;
+        activity.googleDriveFolderUrl = folderUrl;
+        delete activity.googleDriveFolderError;
+        changed = true;
+        updated += 1;
+      }
+      continue;
+    }
+
+    next.push({
+      id: crypto.randomUUID(),
+      name: folderName,
+      slug: makeActivitySlug(folderName),
+      createdAt: Date.parse(folder.createdTime || "") || Date.now(),
+      googleDriveFolderId: folderId,
+      googleDriveFolderUrl: folderUrl
+    });
+    changed = true;
+    imported += 1;
+  }
+
+  return { activities: next, changed, imported, updated };
+}
+
+async function listGoogleDriveChildFolders(accessToken, parentId) {
+  const folders = [];
+  let pageToken = "";
+
+  do {
+    const url = new URL("https://www.googleapis.com/drive/v3/files");
+    url.searchParams.set(
+      "q",
+      `'${parentId.replace(/'/g, "\\'")}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
+    );
+    url.searchParams.set("supportsAllDrives", "true");
+    url.searchParams.set("includeItemsFromAllDrives", "true");
+    url.searchParams.set("fields", "nextPageToken,files(id,name,webViewLink,createdTime)");
+    url.searchParams.set("pageSize", "1000");
+    url.searchParams.set("orderBy", "name");
+    if (pageToken) {
+      url.searchParams.set("pageToken", pageToken);
+    }
+
+    const body = await requestJson(url.href, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
+    folders.push(...(Array.isArray(body.files) ? body.files : []));
+    pageToken = body.nextPageToken || "";
+  } while (pageToken);
+
+  return folders;
+}
+
+function isDefaultActivityName(name) {
+  const normalized = normalizeActivityName(name);
+  return (
+    normalized === normalizeActivityName(defaultActivity.name) ||
+    normalized === "\u0e23\u0e27\u0e21\u0e01\u0e34\u0e08\u0e01\u0e23\u0e23\u0e21" ||
+    normalized === "general"
+  );
+}
+
+function normalizeActivityName(name) {
+  return String(name || "").trim().toLocaleLowerCase();
 }
 
 function sanitizeGoogleDriveFolderName(name) {
