@@ -433,7 +433,9 @@ function renderUserSaveLink() {
 
   const selectedActivity = getSelectedFilterActivity();
   const selectedLink = selectedActivity?.googleDriveFolderUrl || "";
-  const link = selectedLink || galleryLink || "";
+  const defaultActivity = activities.find((activity) => activity.id === "general");
+  const defaultLink = defaultActivity?.googleDriveFolderUrl || "";
+  const link = selectedLink || defaultLink || galleryLink || "";
 
   els.userSaveLink.href = link || "#";
   els.userSaveLink.textContent = selectedLink

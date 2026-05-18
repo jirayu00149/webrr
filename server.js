@@ -140,9 +140,10 @@ async function handleApi(request, response, url) {
     const photos = await readPhotos();
     const activities = await readActivities();
     const shareState = await readShareState();
+    const defaultActivityItem = activities.find((activity) => isDefaultActivityId(activity.id));
     sendJson(response, 200, {
       activities: addActivityCounts(activities, photos),
-      galleryUrl: shareState.galleryUrl || "",
+      galleryUrl: shareState.galleryUrl || defaultActivityItem?.googleDriveFolderUrl || "",
       stats: makeStats(photos)
     });
     return;
@@ -175,10 +176,11 @@ async function handleApi(request, response, url) {
     const selectedActivity = activityId
       ? activities.find((activity) => activity.id === activityId)
       : null;
+    const defaultActivityItem = activities.find((activity) => isDefaultActivityId(activity.id));
 
     sendJson(response, 200, {
       matches,
-      galleryUrl: selectedActivity?.googleDriveFolderUrl || shareState.galleryUrl || "",
+      galleryUrl: selectedActivity?.googleDriveFolderUrl || shareState.galleryUrl || defaultActivityItem?.googleDriveFolderUrl || "",
       stats: makeStats(searchablePhotos)
     });
     return;
@@ -1345,6 +1347,7 @@ async function getGoogleDrivePhotoFolder(photo, config, accessToken) {
   if (activity.googleDriveFolderId) {
     const folderExists = await googleDriveFolderExists(accessToken, activity.googleDriveFolderId);
     if (folderExists) {
+      await ensureGoogleDriveFolderPublic(accessToken, activity.googleDriveFolderId);
       return {
         id: activity.googleDriveFolderId,
         url:
@@ -1370,6 +1373,7 @@ async function getGoogleDrivePhotoFolder(photo, config, accessToken) {
     throw new Error("Google Drive did not create an activity folder.");
   }
 
+  await ensureGoogleDriveFolderPublic(accessToken, folderId);
   activity.googleDriveFolderId = folderId;
   activity.googleDriveFolderUrl = folderUrl;
   await writeActivities(activities);
@@ -1394,6 +1398,7 @@ async function createGoogleDriveFolderForActivity(activity, activities) {
     if (activity.googleDriveFolderId) {
       const folderExists = await googleDriveFolderExists(accessToken, activity.googleDriveFolderId);
       if (folderExists) {
+        await ensureGoogleDriveFolderPublic(accessToken, activity.googleDriveFolderId);
         return {
           status: "saved",
           folderId: activity.googleDriveFolderId,
@@ -1420,6 +1425,7 @@ async function createGoogleDriveFolderForActivity(activity, activities) {
       throw new Error("Google Drive did not create an activity folder.");
     }
 
+    await ensureGoogleDriveFolderPublic(accessToken, folderId);
     activity.googleDriveFolderId = folderId;
     activity.googleDriveFolderUrl = folderUrl;
     delete activity.googleDriveFolderError;
@@ -1450,7 +1456,11 @@ async function syncGoogleDriveActivityFolders() {
 
   try {
     const accessToken = await getGoogleDriveAccessToken(config);
+    await ensureGoogleDriveFolderPublic(accessToken, config.folderId);
     const driveFolders = await listGoogleDriveChildFolders(accessToken, config.folderId);
+    for (const folder of driveFolders) {
+      await ensureGoogleDriveFolderPublic(accessToken, folder.id);
+    }
     const activities = await readActivities();
     const result = mergeGoogleDriveFoldersIntoActivities(activities, driveFolders);
 
@@ -1620,6 +1630,37 @@ async function googleDriveFolderExists(accessToken, folderId) {
       return false;
     }
     throw error;
+  }
+}
+
+async function ensureGoogleDriveFolderPublic(accessToken, folderId) {
+  if (!folderId) {
+    return;
+  }
+
+  const body = JSON.stringify({
+    type: "anyone",
+    role: "reader"
+  });
+
+  try {
+    await requestJson(
+      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(folderId)}/permissions?supportsAllDrives=true&sendNotificationEmail=false&fields=id`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json; charset=UTF-8",
+          "Content-Length": Buffer.byteLength(body)
+        }
+      },
+      body
+    );
+  } catch (error) {
+    const message = sanitizeGoogleError(error).toLowerCase();
+    if (!message.includes("exist")) {
+      console.warn(`Could not make Google Drive folder public: ${sanitizeGoogleError(error)}`);
+    }
   }
 }
 
