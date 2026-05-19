@@ -187,17 +187,31 @@ async function handleApi(request, response, url) {
   }
 
   if (url.pathname === "/api/admin/login" && request.method === "POST") {
-    const body = await readJsonBody(request, 32 * 1024);
+    const isFormLogin = isFormRequest(request);
+    const body = await readLoginBody(request, 32 * 1024);
     if (!body || !safeEqual(String(body.password || ""), adminPassword)) {
+      if (isFormLogin) {
+        redirect(response, "/admin.html?login=failed");
+        return;
+      }
       sendJson(response, 401, { error: "รหัสแอดมินไม่ถูกต้อง" });
       return;
     }
 
     const token = crypto.randomBytes(32).toString("hex");
     sessions.add(token);
+    const cookieHeader = cookie("sff_admin", token, { httpOnly: true, sameSite: "Lax" });
+    if (isFormLogin) {
+      response.writeHead(302, {
+        Location: "/admin.html#uploadPanel",
+        "Set-Cookie": cookieHeader
+      });
+      response.end();
+      return;
+    }
     response.writeHead(200, {
       "Content-Type": "application/json; charset=utf-8",
-      "Set-Cookie": cookie("sff_admin", token, { httpOnly: true, sameSite: "Lax" })
+      "Set-Cookie": cookieHeader
     });
     response.end(JSON.stringify({ ok: true }));
     return;
@@ -2710,7 +2724,19 @@ async function readFileToResponse(response, filePath) {
   }
 }
 
-function readJsonBody(request, limit) {
+async function readLoginBody(request, limit) {
+  const text = await readTextBody(request, limit);
+  if (isFormRequest(request)) {
+    return Object.fromEntries(new URLSearchParams(text));
+  }
+  return JSON.parse(text || "{}");
+}
+
+async function readJsonBody(request, limit) {
+  return JSON.parse((await readTextBody(request, limit)) || "{}");
+}
+
+function readTextBody(request, limit) {
   return new Promise((resolve, reject) => {
     let size = 0;
     const chunks = [];
@@ -2726,15 +2752,15 @@ function readJsonBody(request, limit) {
     });
 
     request.on("end", () => {
-      try {
-        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}"));
-      } catch (error) {
-        reject(error);
-      }
+      resolve(Buffer.concat(chunks).toString("utf8"));
     });
 
     request.on("error", reject);
   });
+}
+
+function isFormRequest(request) {
+  return String(request.headers["content-type"] || "").includes("application/x-www-form-urlencoded");
 }
 
 function sendJson(response, status, payload) {

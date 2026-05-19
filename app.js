@@ -130,6 +130,9 @@ document.addEventListener("DOMContentLoaded", init);
 async function init() {
   bindEvents();
   if (page === "login") {
+    if (new URLSearchParams(window.location.search).get("login") === "failed") {
+      setLoginError("รหัสแอดมินไม่ถูกต้อง");
+    }
     els.adminPassword?.focus();
     return;
   }

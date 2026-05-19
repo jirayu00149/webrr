@@ -14,9 +14,15 @@
         <h1>Admin upload</h1>
         <p>เข้าสู่ระบบเพื่อสร้างกิจกรรม อัปโหลดรูป และซิงก์ไป Google Photos</p>
 
-        <form class="login-form" id="loginForm">
+        <form class="login-form" id="loginForm" method="post" action="/api/admin/login">
           <label for="adminPassword">รหัสผ่านแอดมิน</label>
-          <input id="adminPassword" type="password" autocomplete="current-password" required />
+          <input
+            id="adminPassword"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            required
+          />
           <button class="primary-button" type="submit">เข้าสู่ระบบ</button>
           <p class="form-error" id="loginError" role="alert"></p>
         </form>

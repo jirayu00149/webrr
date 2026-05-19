@@ -115,24 +115,34 @@ async function handleApi(request, env, url) {
   }
 
   if (url.pathname === "/api/admin/login" && request.method === "POST") {
-    const body = await request.json().catch(() => ({}));
+    const isFormLogin = isFormRequest(request);
+    const body = isFormLogin
+      ? Object.fromEntries(await request.formData())
+      : await request.json().catch(() => ({}));
     const password = env.ADMIN_PASSWORD || "admin123";
 
     if (String(body.password || "") !== password) {
+      if (isFormLogin) {
+        return Response.redirect(`${url.origin}/admin.html?login=failed`, 302);
+      }
       return json({ error: "Admin password is incorrect" }, 401);
     }
 
     const token = randomToken();
     await env.DATA.put(`session:${token}`, "1", { expirationTtl: 60 * 60 * 24 });
+    const cookieHeader = cookie(ADMIN_COOKIE, token, {
+      httpOnly: true,
+      sameSite: "Lax",
+      secure: url.protocol === "https:"
+    });
+    if (isFormLogin) {
+      return redirectWithCookie(`${url.origin}/admin.html#uploadPanel`, cookieHeader);
+    }
     return json(
       { ok: true },
       200,
       {
-        "Set-Cookie": cookie(ADMIN_COOKIE, token, {
-          httpOnly: true,
-          sameSite: "Lax",
-          secure: url.protocol === "https:"
-        })
+        "Set-Cookie": cookieHeader
       }
     );
   }
@@ -1414,6 +1424,10 @@ function getCookie(request, name) {
       .filter((parts) => parts.length === 2)
   );
   return cookies[name] || "";
+}
+
+function isFormRequest(request) {
+  return String(request.headers.get("Content-Type") || "").includes("application/x-www-form-urlencoded");
 }
 
 function cookie(name, value, options = {}) {
