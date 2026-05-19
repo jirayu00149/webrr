@@ -16,6 +16,8 @@ const els = {
   galleryDropzone: $("#galleryDropzone"),
   savePhotosBtn: $("#savePhotosBtn"),
   queueList: $("#queueList"),
+  adminViews: document.querySelectorAll(".admin-view"),
+  adminViewLinks: document.querySelectorAll("[data-admin-view-link]"),
   referenceInput: $("#referenceInput"),
   referencePreview: $("#referencePreview"),
   referencePlaceholder: $("#referencePlaceholder"),
@@ -138,6 +140,9 @@ async function init() {
   }
 
   try {
+    if (page === "admin") {
+      updateAdminView();
+    }
     await loadActivityIndex();
     if (page === "admin") {
       await loadShareLink();
@@ -168,6 +173,7 @@ async function init() {
 
 function bindEvents() {
   els.loginForm?.addEventListener("submit", handleLogin);
+  window.addEventListener("hashchange", updateAdminView);
   els.logoutBtn?.addEventListener("click", handleLogout);
   els.activityForm?.addEventListener("submit", handleCreateActivity);
   els.deleteActivityBtn?.addEventListener("click", deleteSelectedActivity);
@@ -286,6 +292,26 @@ function bindEvents() {
       closeImageViewer();
     }
   });
+}
+
+function updateAdminView() {
+  if (page !== "admin" || !els.adminViews?.length) {
+    return;
+  }
+
+  const view = window.location.hash === "#photoBoothPanel" ? "booth" : "upload";
+  els.adminViews.forEach((element) => {
+    const shouldShow = element.classList.contains(
+      view === "booth" ? "admin-booth-view" : "admin-upload-view"
+    );
+    element.classList.toggle("hidden", !shouldShow);
+  });
+  els.adminViewLinks?.forEach((link) => {
+    link.classList.toggle("active", link.dataset.adminViewLink === view);
+  });
+
+  const target = view === "booth" ? els.boothPanel : $("#uploadPanel");
+  window.setTimeout(() => target?.scrollIntoView({ block: "start" }), 0);
 }
 
 async function handleLogin(event) {
@@ -1583,7 +1609,8 @@ async function downloadBoothStrip() {
 }
 
 function printBoothStrip() {
-  const dataUrl = els.boothStripCanvas?.toDataURL("image/jpeg", 0.94);
+  const printCanvas = makeBoothPrintCanvas();
+  const dataUrl = printCanvas?.toDataURL("image/jpeg", 0.94);
   if (!dataUrl) return;
   setBoothStatus("กำลังเปิดหน้าพิมพ์...");
 
@@ -1607,6 +1634,20 @@ function printBoothStrip() {
   printBoothStripInFrame(dataUrl);
 }
 
+function makeBoothPrintCanvas() {
+  const source = els.boothStripCanvas;
+  if (!source) {
+    return null;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = source.width;
+  canvas.height = source.height;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(source, 0, 0);
+  return canvas;
+}
+
 function writeBoothPrintDocument(documentRef) {
   documentRef.open();
   documentRef.write(`
@@ -1615,7 +1656,7 @@ function writeBoothPrintDocument(documentRef) {
       <head>
         <title>Photo Booth Print</title>
         <style>
-          @page { margin: 0; size: auto; }
+          @page { margin: 0; size: 80mm 240mm; }
           * { box-sizing: border-box; }
           html, body {
             margin: 0;
@@ -1626,13 +1667,13 @@ function writeBoothPrintDocument(documentRef) {
             display: grid;
             min-height: 100vh;
             place-items: center;
-            padding: 8mm;
+            padding: 0;
           }
           img {
             display: block;
             width: auto;
-            max-width: 100%;
-            max-height: calc(100vh - 16mm);
+            max-width: 80mm;
+            max-height: 100vh;
             object-fit: contain;
           }
           @media print {
@@ -1722,7 +1763,7 @@ async function generateBoothGif(options = {}) {
   }
 
   boothShots.forEach((shot) => {
-    const frame = makeBoothGifFrameCanvas(shot);
+    const frame = makeBoothSinglePhotoGifFrame(shot);
     gif.addFrame(frame, { delay: 720, copy: true });
   });
 
@@ -1761,7 +1802,7 @@ function getBoothGifWorkerScript() {
   return boothGifWorkerUrl;
 }
 
-function makeBoothGifFrameCanvas(shot) {
+function makeBoothSinglePhotoGifFrame(shot) {
   const canvas = document.createElement("canvas");
   canvas.width = BOOTH_GIF_WIDTH;
   canvas.height = BOOTH_GIF_HEIGHT;
@@ -1769,8 +1810,8 @@ function makeBoothGifFrameCanvas(shot) {
   const frameColor = els.boothFrameColorInput?.value || "#ffffff";
   const textColor = els.boothTextColorInput?.value || "#ffffff";
   const accentColor = els.boothAccentColorInput?.value || "#ec4899";
-  const photoFit = els.boothFitSelect?.value || "cover";
-  const photoScale = Number(els.boothPhotoScaleInput?.value || 100) / 100;
+  const photoFit = "contain";
+  const photoScale = 1;
   const slot = {
     x: Math.round(canvas.width * 0.079),
     y: Math.round(canvas.height * 0.119),
@@ -1838,7 +1879,7 @@ async function uploadBoothStrip() {
     const gifBlob = await generateBoothGif({ download: false });
     if (gifBlob) {
       const gifFile = new File([gifBlob], makeBoothFileName("gif"), { type: "image/gif" });
-      const firstFrameBlob = await canvasToBlob(makeBoothGifFrameCanvas(boothShots[0]), "image/jpeg", 0.9);
+      const firstFrameBlob = await canvasToBlob(makeBoothSinglePhotoGifFrame(boothShots[0]), "image/jpeg", 0.9);
       await uploadBoothFile(gifFile, activity, "photobooth-gif", firstFrameBlob);
       gifUploaded = true;
     }

@@ -297,10 +297,16 @@ h2 {
 }
 
 .secondary-button:hover:not(:disabled),
+.secondary-button.active,
 .ghost-button:hover:not(:disabled) {
   border-color: rgba(22, 93, 255, 0.42);
   box-shadow: var(--shadow-soft);
   transform: translateY(-1px);
+}
+
+.secondary-button.active {
+  background: var(--ink);
+  color: #fff;
 }
 
 .danger-button {

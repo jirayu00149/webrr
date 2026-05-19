@@ -35,10 +35,15 @@
           <a class="secondary-button small-button" href="index.html">
             HOME
           </a>
-          <a class="secondary-button small-button" href="#uploadPanel">
+          <a class="secondary-button small-button" data-admin-view-link="upload" href="#uploadPanel">
             UPLOAD
           </a>
-          <a class="secondary-button small-button" id="boothNavLink" href="#photoBoothPanel">
+          <a
+            class="secondary-button small-button"
+            data-admin-view-link="booth"
+            id="boothNavLink"
+            href="#photoBoothPanel"
+          >
             PHOTO BOOTH
           </a>
           <button class="secondary-button small-button" id="logoutBtn" type="button">
@@ -49,7 +54,7 @@
     </header>
 
     <main class="app-shell page-layout admin-only-layout">
-      <section class="page-hero admin-upload-hero" id="adminHome">
+      <section class="page-hero admin-upload-hero admin-view admin-upload-view" id="adminHome">
         <div>
           <p class="eyebrow">Admin only</p>
           <h1>จัดการรูปกิจกรรม</h1>
@@ -60,14 +65,14 @@
         </div>
       </section>
 
-      <section class="notice">
+      <section class="notice admin-view admin-upload-view admin-booth-view">
         <div>
           <h2>ตรวจสิทธิ์ก่อนอัปโหลด</h2>
           <p>ใช้เฉพาะรูปที่โรงเรียนได้รับอนุญาตให้จัดเก็บและค้นหาแล้วเท่านั้น</p>
         </div>
       </section>
 
-      <section class="panel activity-panel">
+      <section class="panel activity-panel admin-view admin-upload-view admin-booth-view">
         <div class="panel-header">
           <div>
             <p class="eyebrow">Activity folders</p>
@@ -115,7 +120,7 @@
         <div class="activity-list" id="activityList" aria-live="polite"></div>
       </section>
 
-      <section class="panel photobooth-panel" id="photoBoothPanel">
+      <section class="panel photobooth-panel admin-view admin-booth-view" id="photoBoothPanel">
         <div class="panel-header">
           <div>
             <p class="eyebrow">Photo booth</p>
@@ -257,7 +262,7 @@
         </div>
       </section>
 
-      <section class="panel upload-panel admin-upload-panel" id="uploadPanel">
+      <section class="panel upload-panel admin-upload-panel admin-view admin-upload-view" id="uploadPanel">
         <div class="panel-header">
           <div>
             <p class="eyebrow">Upload</p>
@@ -285,7 +290,7 @@
         <div class="queue" id="queueList" aria-live="polite"></div>
       </section>
 
-      <section class="panel gallery-link-panel">
+      <section class="panel gallery-link-panel admin-view admin-upload-view">
         <div class="panel-header">
           <div>
             <p class="eyebrow">Share link</p>
@@ -319,7 +324,7 @@
         </div>
       </section>
 
-      <section class="panel admin-library-panel">
+      <section class="panel admin-library-panel admin-view admin-upload-view">
         <div class="panel-header">
           <div>
             <p class="eyebrow">Photo management</p>
@@ -333,7 +338,7 @@
         <div class="admin-photo-grid" id="adminPhotoGrid"></div>
       </section>
 
-      <section class="panel status-card admin-status" aria-live="polite">
+      <section class="panel status-card admin-status admin-view admin-upload-view" aria-live="polite">
         <p class="eyebrow">Status</p>
         <h2>สถานะระบบ</h2>
         <p id="statusText">กำลังเตรียมโมเดลตรวจจับใบหน้า</p>
@@ -349,7 +354,7 @@
         </div>
       </section>
 
-      <section class="panel status-card admin-status">
+      <section class="panel status-card admin-status admin-view admin-upload-view">
         <p class="eyebrow">Share link</p>
         <h2>ลิงก์สุ่มสำหรับแชร์</h2>
         <p class="small-note">
