@@ -31,6 +31,7 @@ const els = {
   loginForm: $("#loginForm"),
   loginError: $("#loginError"),
   adminPassword: $("#adminPassword"),
+  loginSubmitBtn: $("#loginForm button[type='submit']"),
   logoutBtn: $("#logoutBtn"),
   activityForm: $("#activityForm"),
   activityName: $("#activityName"),
@@ -287,11 +288,16 @@ function bindEvents() {
 async function handleLogin(event) {
   event.preventDefault();
   setLoginError("");
+  setLoginLoading(true);
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), 12000);
 
   try {
     const response = await fetch("/api/admin/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      signal: controller.signal,
       body: JSON.stringify({ password: els.adminPassword?.value || "" })
     });
 
@@ -301,9 +307,16 @@ async function handleLogin(event) {
       return;
     }
 
-    window.location.href = "/admin.html#uploadPanel";
-  } catch {
-    setLoginError("เชื่อมต่อ server ไม่สำเร็จ");
+    window.location.replace("/admin.html#uploadPanel");
+  } catch (error) {
+    setLoginError(
+      error?.name === "AbortError"
+        ? "เข้าสู่ระบบนานผิดปกติ ลองรีเฟรชหน้าแล้วกดใหม่อีกครั้ง"
+        : "เชื่อมต่อ server ไม่สำเร็จ"
+    );
+  } finally {
+    window.clearTimeout(timer);
+    setLoginLoading(false);
   }
 }
 
@@ -2545,6 +2558,16 @@ function setModelStatus(kind, text) {
 function setLoginError(message) {
   if (els.loginError) {
     els.loginError.textContent = message;
+  }
+}
+
+function setLoginLoading(isLoading) {
+  if (els.loginSubmitBtn) {
+    els.loginSubmitBtn.disabled = isLoading;
+    els.loginSubmitBtn.textContent = isLoading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ";
+  }
+  if (els.adminPassword) {
+    els.adminPassword.disabled = isLoading;
   }
 }
 
