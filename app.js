@@ -1,5 +1,6 @@
 const MODEL_URL = "https://justadudewhohacks.github.io/face-api.js/models";
 const DEFAULT_THRESHOLD = 0.52;
+const BOOTH_REQUIRED_SHOTS = 3;
 
 const page = document.body.dataset.page || "user";
 const $ = (selector) => document.querySelector(selector);
@@ -59,7 +60,31 @@ const els = {
   googleDriveFolderLink: $("#googleDriveFolderLink"),
   connectGoogleDriveBtn: $("#connectGoogleDriveBtn"),
   googleDriveSetupHint: $("#googleDriveSetupHint"),
-  saveGoogleDriveConfigBtn: $("#saveGoogleDriveConfigBtn")
+  saveGoogleDriveConfigBtn: $("#saveGoogleDriveConfigBtn"),
+  boothVideo: $("#boothVideo"),
+  boothVideoEmpty: $("#boothVideoEmpty"),
+  boothCameraSelect: $("#boothCameraSelect"),
+  boothStartCameraBtn: $("#boothStartCameraBtn"),
+  boothCaptureBtn: $("#boothCaptureBtn"),
+  boothImportBtn: $("#boothImportBtn"),
+  boothImportInput: $("#boothImportInput"),
+  boothShotList: $("#boothShotList"),
+  boothStripCanvas: $("#boothStripCanvas"),
+  boothClearBtn: $("#boothClearBtn"),
+  boothDownloadBtn: $("#boothDownloadBtn"),
+  boothPrintBtn: $("#boothPrintBtn"),
+  boothGifBtn: $("#boothGifBtn"),
+  boothUploadBtn: $("#boothUploadBtn"),
+  boothStatus: $("#boothStatus"),
+  boothTitleInput: $("#boothTitleInput"),
+  boothSubtitleInput: $("#boothSubtitleInput"),
+  boothWatermarkInput: $("#boothWatermarkInput"),
+  boothBgColorInput: $("#boothBgColorInput"),
+  boothFrameColorInput: $("#boothFrameColorInput"),
+  boothTextColorInput: $("#boothTextColorInput"),
+  boothAccentColorInput: $("#boothAccentColorInput"),
+  boothLogoInput: $("#boothLogoInput"),
+  boothOverlayInput: $("#boothOverlayInput")
 };
 
 let modelsReady = false;
@@ -73,6 +98,11 @@ let adminPhotos = [];
 let galleryLink = "";
 let currentShareLinkText = "";
 let currentShareLinkUrl = "";
+let boothShots = [];
+let boothStream = null;
+let boothLogoImage = null;
+let boothOverlayImage = null;
+let boothLastGifBlob = null;
 
 document.addEventListener("DOMContentLoaded", init);
 
@@ -90,6 +120,7 @@ async function init() {
       await loadGoogleDriveConfig();
       await loadGoogleDriveStatus();
       await loadAdminPhotos();
+      await initPhotoBooth();
     }
 
     if (page === "admin" || page === "user") {
@@ -116,6 +147,30 @@ function bindEvents() {
   els.saveGalleryLinkBtn?.addEventListener("click", saveGalleryLink);
   els.regenerateShareLinkBtn?.addEventListener("click", regenerateShareLink);
   els.copyShareLinkBtn?.addEventListener("click", copyShareLink);
+  els.boothStartCameraBtn?.addEventListener("click", startBoothCamera);
+  els.boothCaptureBtn?.addEventListener("click", captureBoothShot);
+  els.boothImportBtn?.addEventListener("click", () => els.boothImportInput?.click());
+  els.boothImportInput?.addEventListener("change", (event) => {
+    importBoothShots(event.target.files);
+    event.target.value = "";
+  });
+  els.boothClearBtn?.addEventListener("click", clearBoothShots);
+  els.boothDownloadBtn?.addEventListener("click", downloadBoothStrip);
+  els.boothPrintBtn?.addEventListener("click", printBoothStrip);
+  els.boothGifBtn?.addEventListener("click", () => generateBoothGif({ download: true }));
+  els.boothUploadBtn?.addEventListener("click", uploadBoothStrip);
+  els.boothCameraSelect?.addEventListener("change", startBoothCamera);
+  els.boothLogoInput?.addEventListener("change", (event) => loadBoothAsset(event.target.files?.[0], "logo"));
+  els.boothOverlayInput?.addEventListener("change", (event) => loadBoothAsset(event.target.files?.[0], "overlay"));
+  [
+    els.boothTitleInput,
+    els.boothSubtitleInput,
+    els.boothWatermarkInput,
+    els.boothBgColorInput,
+    els.boothFrameColorInput,
+    els.boothTextColorInput,
+    els.boothAccentColorInput
+  ].forEach((input) => input?.addEventListener("input", renderBoothStrip));
 
   els.activitySelect?.addEventListener("change", () => {
     updateDeleteActivityButton();
@@ -941,6 +996,503 @@ function updateSelectedStats() {
 
   if (els.photoCount) {
     els.photoCount.textContent = currentStats.photos;
+  }
+}
+
+async function initPhotoBooth() {
+  if (!els.boothStripCanvas) {
+    return;
+  }
+
+  renderBoothStrip();
+  renderBoothShotList();
+  await refreshBoothCameras();
+}
+
+async function refreshBoothCameras() {
+  if (!els.boothCameraSelect || !navigator.mediaDevices?.enumerateDevices) {
+    return;
+  }
+
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cameras = devices.filter((device) => device.kind === "videoinput");
+    els.boothCameraSelect.innerHTML = cameras.length
+      ? cameras
+          .map((camera, index) => {
+            const label = camera.label || `Camera ${index + 1}`;
+            return `<option value="${escapeHtml(camera.deviceId)}">${escapeHtml(label)}</option>`;
+          })
+          .join("")
+      : `<option value="">Default camera</option>`;
+  } catch {
+    els.boothCameraSelect.innerHTML = `<option value="">Default camera</option>`;
+  }
+}
+
+async function startBoothCamera() {
+  if (!els.boothVideo || !navigator.mediaDevices?.getUserMedia) {
+    setBoothStatus("เบราว์เซอร์นี้ไม่รองรับการใช้กล้อง");
+    return;
+  }
+
+  stopBoothCamera();
+  const deviceId = els.boothCameraSelect?.value || "";
+
+  try {
+    boothStream = await navigator.mediaDevices.getUserMedia({
+      video: deviceId
+        ? { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+        : { facingMode: "user", width: { ideal: 1920 }, height: { ideal: 1080 } },
+      audio: false
+    });
+    els.boothVideo.srcObject = boothStream;
+    els.boothVideoEmpty?.classList.add("hidden");
+    if (els.boothCaptureBtn) {
+      els.boothCaptureBtn.disabled = false;
+    }
+    await refreshBoothCameras();
+    setBoothStatus("กล้องพร้อม ถ้าใช้ Canon ให้เลือก Canon EOS Webcam Utility ในรายการกล้อง");
+  } catch (error) {
+    console.error(error);
+    setBoothStatus("เปิดกล้องไม่สำเร็จ ตรวจ permission กล้อง หรือเลือกกล้องใหม่");
+  }
+}
+
+function stopBoothCamera() {
+  if (boothStream) {
+    boothStream.getTracks().forEach((track) => track.stop());
+    boothStream = null;
+  }
+}
+
+async function captureBoothShot() {
+  if (!els.boothVideo || !els.boothVideo.videoWidth) {
+    setBoothStatus("ยังไม่พบภาพจากกล้อง");
+    return;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 1280;
+  canvas.height = 720;
+  drawImageCover(canvas.getContext("2d"), els.boothVideo, 0, 0, canvas.width, canvas.height);
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+  const image = await loadImageFromDataUrl(dataUrl);
+  addBoothShot({
+    id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`,
+    name: `booth-shot-${boothShots.length + 1}.jpg`,
+    dataUrl,
+    image
+  });
+}
+
+async function importBoothShots(fileList) {
+  const files = Array.from(fileList || []).filter((file) => file.type.startsWith("image/"));
+  if (!files.length) {
+    setBoothStatus("ไม่พบไฟล์รูปจาก Lr/export");
+    return;
+  }
+
+  for (const file of files.slice(0, BOOTH_REQUIRED_SHOTS)) {
+    const dataUrl = await readAsDataUrl(file);
+    const image = await loadImageFromDataUrl(dataUrl);
+    addBoothShot({
+      id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`,
+      name: file.name,
+      dataUrl,
+      image
+    });
+  }
+}
+
+function addBoothShot(shot) {
+  if (boothShots.length >= BOOTH_REQUIRED_SHOTS) {
+    boothShots.shift();
+  }
+  boothShots.push(shot);
+  boothLastGifBlob = null;
+  renderBoothShotList();
+  renderBoothStrip();
+  setBoothStatus(
+    boothShots.length === BOOTH_REQUIRED_SHOTS
+      ? "ครบ 3 รูปแล้ว ดาวน์โหลด พิมพ์ สร้าง GIF หรืออัปโหลดเข้า Drive ได้เลย"
+      : `ใส่รูปแล้ว ${boothShots.length}/${BOOTH_REQUIRED_SHOTS}`
+  );
+}
+
+function clearBoothShots() {
+  boothShots = [];
+  boothLastGifBlob = null;
+  renderBoothShotList();
+  renderBoothStrip();
+  setBoothStatus("ล้างรูปแล้ว พร้อมถ่ายชุดใหม่");
+}
+
+function renderBoothShotList() {
+  if (!els.boothShotList) {
+    return;
+  }
+
+  els.boothShotList.innerHTML = Array.from({ length: BOOTH_REQUIRED_SHOTS }, (_, index) => {
+    const shot = boothShots[index];
+    return shot
+      ? `<figure><img src="${shot.dataUrl}" alt="" /><figcaption>${index + 1}</figcaption></figure>`
+      : `<figure class="empty"><span>${index + 1}</span><figcaption>รอรูป</figcaption></figure>`;
+  }).join("");
+}
+
+function renderBoothStrip() {
+  const canvas = els.boothStripCanvas;
+  if (!canvas) {
+    return;
+  }
+
+  const ctx = canvas.getContext("2d");
+  const width = canvas.width;
+  const height = canvas.height;
+  const bgColor = els.boothBgColorInput?.value || "#111827";
+  const frameColor = els.boothFrameColorInput?.value || "#ffffff";
+  const textColor = els.boothTextColorInput?.value || "#ffffff";
+  const accentColor = els.boothAccentColorInput?.value || "#ec4899";
+  const title = els.boothTitleInput?.value.trim() || "BSS PHOTO BOOTH";
+  const subtitle = els.boothSubtitleInput?.value.trim() || "School memories";
+  const watermark = els.boothWatermarkInput?.value.trim() || "";
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0, 0, width, height);
+
+  if (boothOverlayImage) {
+    ctx.save();
+    ctx.globalAlpha = 0.28;
+    drawImageCover(ctx, boothOverlayImage, 0, 0, width, height);
+    ctx.restore();
+  }
+
+  ctx.fillStyle = accentColor;
+  ctx.fillRect(0, 0, width, 22);
+  ctx.fillRect(0, height - 22, width, 22);
+  ctx.strokeStyle = accentColor;
+  ctx.lineWidth = 4;
+  for (let index = 0; index < 5; index += 1) {
+    ctx.beginPath();
+    ctx.arc(width - 90 - index * 46, 112 + index * 14, 110 + index * 18, 0.1, 1.5);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = textColor;
+  ctx.textAlign = "center";
+  ctx.font = "700 58px Georgia, serif";
+  wrapCanvasText(ctx, title.toUpperCase(), width / 2, 112, width - 120, 66);
+  ctx.font = "800 26px Segoe UI, sans-serif";
+  ctx.fillText(new Date().toLocaleDateString("th-TH"), width / 2, 226);
+
+  const photoX = 62;
+  const photoW = width - 124;
+  const photoH = 520;
+  const gap = 44;
+  let y = 310;
+
+  for (let index = 0; index < BOOTH_REQUIRED_SHOTS; index += 1) {
+    ctx.fillStyle = frameColor;
+    roundRect(ctx, photoX - 10, y - 10, photoW + 20, photoH + 20, 6);
+    ctx.fill();
+    ctx.fillStyle = "#050816";
+    ctx.fillRect(photoX, y, photoW, photoH);
+
+    const shot = boothShots[index];
+    if (shot) {
+      drawImageCover(ctx, shot.image, photoX, y, photoW, photoH);
+      if (watermark) {
+        ctx.save();
+        ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
+        ctx.fillRect(photoX + photoW - 230, y + 20, 198, 46);
+        ctx.fillStyle = "#fff";
+        ctx.font = "800 23px Segoe UI, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(watermark, photoX + photoW - 131, y + 51);
+        ctx.restore();
+      }
+    } else {
+      ctx.fillStyle = "rgba(255,255,255,0.72)";
+      ctx.font = "800 30px Segoe UI, sans-serif";
+      ctx.fillText(`PHOTO ${index + 1}`, width / 2, y + photoH / 2);
+    }
+    y += photoH + gap;
+  }
+
+  const logoSize = 128;
+  if (boothLogoImage) {
+    drawImageContain(ctx, boothLogoImage, width / 2 - logoSize / 2, height - 300, logoSize, logoSize);
+  }
+
+  ctx.fillStyle = textColor;
+  ctx.font = "700 44px Georgia, serif";
+  ctx.fillText(subtitle, width / 2, height - 132);
+  ctx.font = "700 22px Segoe UI, sans-serif";
+  ctx.fillText("PHOTO BSS", width / 2, height - 86);
+  updateBoothButtons();
+}
+
+function updateBoothButtons() {
+  const ready = boothShots.length === BOOTH_REQUIRED_SHOTS;
+  [els.boothDownloadBtn, els.boothPrintBtn, els.boothGifBtn, els.boothUploadBtn].forEach((button) => {
+    if (button) button.disabled = !ready;
+  });
+}
+
+async function loadBoothAsset(file, type) {
+  if (!file || !file.type.startsWith("image/")) {
+    return;
+  }
+
+  const dataUrl = await readAsDataUrl(file);
+  const image = await loadImageFromDataUrl(dataUrl);
+  if (type === "logo") {
+    boothLogoImage = image;
+  } else {
+    boothOverlayImage = image;
+  }
+  renderBoothStrip();
+}
+
+async function downloadBoothStrip() {
+  const blob = await canvasToBlob(els.boothStripCanvas, "image/jpeg", 0.94);
+  downloadBlob(blob, makeBoothFileName("jpg"));
+}
+
+function printBoothStrip() {
+  const dataUrl = els.boothStripCanvas?.toDataURL("image/jpeg", 0.94);
+  if (!dataUrl) return;
+  const printWindow = window.open("", "_blank", "noopener,noreferrer");
+  if (!printWindow) return;
+  printWindow.document.write(`
+    <html><head><title>Photo Booth Print</title>
+    <style>body{margin:0;display:grid;min-height:100vh;place-items:center;background:#fff}img{width:100%;max-width:380px;height:auto}</style>
+    </head><body><img src="${dataUrl}" onload="window.print();window.close()" /></body></html>
+  `);
+  printWindow.document.close();
+}
+
+async function generateBoothGif(options = {}) {
+  if (boothShots.length < BOOTH_REQUIRED_SHOTS) {
+    setBoothStatus("ต้องมีรูปครบ 3 รูปก่อนสร้าง GIF");
+    return null;
+  }
+
+  if (!window.GIF) {
+    setBoothStatus("โหลดตัวสร้าง GIF ไม่สำเร็จ ลองเช็กอินเทอร์เน็ตแล้วรีเฟรชหน้า");
+    return null;
+  }
+
+  setBoothStatus("กำลังสร้าง GIF...");
+  const gif = new window.GIF({
+    workers: 2,
+    quality: 10,
+    width: 960,
+    height: 540,
+    workerScript: "https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js"
+  });
+
+  boothShots.forEach((shot) => {
+    const frame = makeBoothGifFrameCanvas(shot);
+    gif.addFrame(frame, { delay: 780 });
+  });
+
+  const blob = await new Promise((resolve) => {
+    gif.on("finished", resolve);
+    gif.render();
+  });
+  boothLastGifBlob = blob;
+
+  if (options.download) {
+    downloadBlob(blob, makeBoothFileName("gif"));
+  }
+  setBoothStatus("สร้าง GIF สำเร็จ");
+  return blob;
+}
+
+function makeBoothGifFrameCanvas(shot) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 960;
+  canvas.height = 540;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = els.boothBgColorInput?.value || "#111827";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  drawImageCover(ctx, shot.image, 0, 0, canvas.width, canvas.height);
+  if (boothLogoImage) {
+    drawImageContain(ctx, boothLogoImage, canvas.width - 156, 28, 120, 80);
+  }
+  const watermark = els.boothWatermarkInput?.value.trim() || "";
+  if (watermark) {
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.fillRect(canvas.width - 260, canvas.height - 76, 220, 44);
+    ctx.fillStyle = "#fff";
+    ctx.font = "800 24px Segoe UI, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(watermark, canvas.width - 150, canvas.height - 46);
+  }
+  return canvas;
+}
+
+async function uploadBoothStrip() {
+  if (!modelsReady) {
+    setBoothStatus("รอโมเดลตรวจจับใบหน้าพร้อมก่อน");
+    return;
+  }
+
+  const activityId = els.activitySelect?.value;
+  const activity = activities.find((item) => item.id === activityId);
+  if (!activity) {
+    setBoothStatus("เลือกโฟลเดอร์กิจกรรมก่อนอัปโหลด");
+    els.activitySelect?.focus();
+    return;
+  }
+
+  try {
+    els.boothUploadBtn.disabled = true;
+    setBoothStatus("กำลังอัปโหลดโพลารอยเข้า Drive...");
+    const stripBlob = await canvasToBlob(els.boothStripCanvas, "image/jpeg", 0.94);
+    const stripFile = new File([stripBlob], makeBoothFileName("jpg"), { type: "image/jpeg" });
+    await uploadBoothFile(stripFile, activity, "photobooth-strip");
+
+    const gifBlob = boothLastGifBlob || (await generateBoothGif({ download: false }));
+    if (gifBlob) {
+      const gifFile = new File([gifBlob], makeBoothFileName("gif"), { type: "image/gif" });
+      const firstFrameBlob = await canvasToBlob(makeBoothGifFrameCanvas(boothShots[0]), "image/jpeg", 0.9);
+      await uploadBoothFile(gifFile, activity, "photobooth-gif", firstFrameBlob);
+    }
+
+    await loadActivityIndex();
+    await loadAdminPhotos();
+    setBoothStatus("อัปโหลดโฟโต้บูธและ GIF เข้า Drive แล้ว");
+  } catch (error) {
+    console.error(error);
+    if (error.message === "UNAUTHORIZED") {
+      window.location.href = "/admin.html";
+      return;
+    }
+    setBoothStatus(error.message || "อัปโหลดโฟโต้บูธไม่สำเร็จ");
+  } finally {
+    updateBoothButtons();
+  }
+}
+
+async function uploadBoothFile(file, activity, label, detectBlob = null) {
+  const detectionFile = detectBlob
+    ? new File([detectBlob], `${label}-face.jpg`, { type: "image/jpeg" })
+    : file;
+  const image = await loadImage(detectionFile);
+  const detections = await detectFaces(image);
+  const imageData = await readAsDataUrl(file);
+  const payload = {
+    activityId: activity.id,
+    name: file.name,
+    type: file.type,
+    size: file.size,
+    lastModified: Date.now(),
+    width: image.naturalWidth,
+    height: image.naturalHeight,
+    imageData,
+    faces: detections.map((detection) => ({
+      descriptor: Array.from(detection.descriptor),
+      box: {
+        x: detection.detection.box.x,
+        y: detection.detection.box.y,
+        width: detection.detection.box.width,
+        height: detection.detection.box.height
+      }
+    }))
+  };
+  await apiPost("/api/admin/photos", payload);
+}
+
+function setBoothStatus(message) {
+  if (els.boothStatus) {
+    els.boothStatus.textContent = message;
+  }
+  setStatus(message);
+}
+
+function makeBoothFileName(extension) {
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  return `photo-booth-${stamp}.${extension}`;
+}
+
+function canvasToBlob(canvas, type = "image/png", quality) {
+  return new Promise((resolve, reject) => {
+    if (!canvas) {
+      reject(new Error("Canvas is missing"));
+      return;
+    }
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error("Cannot export canvas"));
+    }, type, quality);
+  });
+}
+
+function downloadBlob(blob, fileName) {
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+function loadImageFromDataUrl(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Cannot load image"));
+    image.src = dataUrl;
+  });
+}
+
+function drawImageCover(ctx, image, x, y, width, height) {
+  const sourceWidth = image.videoWidth || image.naturalWidth || image.width;
+  const sourceHeight = image.videoHeight || image.naturalHeight || image.height;
+  const scale = Math.max(width / sourceWidth, height / sourceHeight);
+  const drawWidth = sourceWidth * scale;
+  const drawHeight = sourceHeight * scale;
+  ctx.drawImage(image, x + (width - drawWidth) / 2, y + (height - drawHeight) / 2, drawWidth, drawHeight);
+}
+
+function drawImageContain(ctx, image, x, y, width, height) {
+  const sourceWidth = image.naturalWidth || image.width;
+  const sourceHeight = image.naturalHeight || image.height;
+  const scale = Math.min(width / sourceWidth, height / sourceHeight);
+  const drawWidth = sourceWidth * scale;
+  const drawHeight = sourceHeight * scale;
+  ctx.drawImage(image, x + (width - drawWidth) / 2, y + (height - drawHeight) / 2, drawWidth, drawHeight);
+}
+
+function roundRect(ctx, x, y, width, height, radius) {
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.arcTo(x + width, y, x + width, y + height, radius);
+  ctx.arcTo(x + width, y + height, x, y + height, radius);
+  ctx.arcTo(x, y + height, x, y, radius);
+  ctx.arcTo(x, y, x + width, y, radius);
+  ctx.closePath();
+}
+
+function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight) {
+  const words = String(text).split(/\s+/);
+  let line = "";
+  let currentY = y;
+  for (const word of words) {
+    const test = line ? `${line} ${word}` : word;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      ctx.fillText(line, x, currentY);
+      line = word;
+      currentY += lineHeight;
+    } else {
+      line = test;
+    }
+  }
+  if (line) {
+    ctx.fillText(line, x, currentY);
   }
 }
 

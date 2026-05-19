@@ -15,6 +15,10 @@
       defer
       src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"
     ></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.min.js"
+    ></script>
     <script defer src="app.js"></script>
   </head>
   <body data-page="admin">
@@ -98,6 +102,103 @@
         </div>
 
         <div class="activity-list" id="activityList" aria-live="polite"></div>
+      </section>
+
+      <section class="panel photobooth-panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Photo booth</p>
+            <h2>โฟโต้บูธ 3 รูป</h2>
+          </div>
+        </div>
+
+        <div class="photobooth-layout">
+          <div class="booth-capture">
+            <div class="booth-video-wrap">
+              <video id="boothVideo" autoplay playsinline muted></video>
+              <div class="booth-video-empty" id="boothVideoEmpty">
+                เชื่อมต่อกล้องหรืออัปโหลดรูปจาก Lr
+              </div>
+            </div>
+            <div class="booth-camera-controls">
+              <select id="boothCameraSelect" class="select-input"></select>
+              <button class="secondary-button small-button" id="boothStartCameraBtn" type="button">
+                เปิดกล้อง
+              </button>
+              <button class="primary-button small-button" id="boothCaptureBtn" type="button" disabled>
+                ถ่ายรูป
+              </button>
+              <button class="ghost-button small-button" id="boothImportBtn" type="button">
+                นำเข้าจาก Lr
+              </button>
+              <input id="boothImportInput" type="file" accept="image/*" multiple hidden />
+            </div>
+            <div class="booth-shot-list" id="boothShotList" aria-live="polite"></div>
+          </div>
+
+          <div class="booth-preview-card">
+            <canvas id="boothStripCanvas" width="900" height="2700"></canvas>
+            <div class="button-row booth-actions">
+              <button class="secondary-button small-button" id="boothClearBtn" type="button">
+                ล้างรูป
+              </button>
+              <button class="secondary-button small-button" id="boothDownloadBtn" type="button" disabled>
+                ดาวน์โหลด
+              </button>
+              <button class="secondary-button small-button" id="boothPrintBtn" type="button" disabled>
+                พิมพ์
+              </button>
+              <button class="secondary-button small-button" id="boothGifBtn" type="button" disabled>
+                สร้าง GIF
+              </button>
+              <button class="primary-button small-button" id="boothUploadBtn" type="button" disabled>
+                อัปโหลดเข้า Drive
+              </button>
+            </div>
+            <p class="small-note" id="boothStatus">ถ่ายหรือใส่รูปให้ครบ 3 รูป แล้วระบบจะจัดโพลารอยให้อัตโนมัติ</p>
+          </div>
+
+          <div class="booth-style-panel">
+            <label>
+              หัวข้อบนเฟรม
+              <input id="boothTitleInput" type="text" value="BSS PHOTO BOOTH" />
+            </label>
+            <label>
+              ข้อความล่างเฟรม
+              <input id="boothSubtitleInput" type="text" value="School memories" />
+            </label>
+            <label>
+              ลายน้ำ
+              <input id="boothWatermarkInput" type="text" value="PHOTO BSS" />
+            </label>
+            <div class="booth-color-grid">
+              <label>
+                พื้นหลัง
+                <input id="boothBgColorInput" type="color" value="#111827" />
+              </label>
+              <label>
+                กรอบรูป
+                <input id="boothFrameColorInput" type="color" value="#ffffff" />
+              </label>
+              <label>
+                สีตัวอักษร
+                <input id="boothTextColorInput" type="color" value="#ffffff" />
+              </label>
+              <label>
+                เส้นตกแต่ง
+                <input id="boothAccentColorInput" type="color" value="#ec4899" />
+              </label>
+            </div>
+            <label>
+              โลโก้/ภาพลายน้ำ
+              <input id="boothLogoInput" type="file" accept="image/*" />
+            </label>
+            <label>
+              ภาพพื้นหลัง/ลายเฟรม
+              <input id="boothOverlayInput" type="file" accept="image/*" />
+            </label>
+          </div>
+        </div>
       </section>
 
       <section class="panel upload-panel admin-upload-panel">
