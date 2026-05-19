@@ -1569,14 +1569,113 @@ async function downloadBoothStrip() {
 function printBoothStrip() {
   const dataUrl = els.boothStripCanvas?.toDataURL("image/jpeg", 0.94);
   if (!dataUrl) return;
-  const printWindow = window.open("", "_blank", "noopener,noreferrer");
-  if (!printWindow) return;
-  printWindow.document.write(`
-    <html><head><title>Photo Booth Print</title>
-    <style>body{margin:0;display:grid;min-height:100vh;place-items:center;background:#fff}img{width:100%;max-width:380px;height:auto}</style>
-    </head><body><img src="${dataUrl}" onload="window.print();window.close()" /></body></html>
+  setBoothStatus("กำลังเปิดหน้าพิมพ์...");
+
+  const printWindow = window.open("", "photobss-print", "width=520,height=900");
+  if (printWindow) {
+    writeBoothPrintDocument(printWindow.document);
+    const image = printWindow.document.getElementById("boothPrintImage");
+    image.onload = () => {
+      window.setTimeout(() => {
+        printWindow.focus();
+        printWindow.print();
+        setBoothStatus("เปิดหน้าพิมพ์แล้ว");
+      }, 250);
+    };
+    image.onerror = () => setBoothStatus("โหลดภาพสำหรับพิมพ์ไม่สำเร็จ");
+    printWindow.addEventListener("afterprint", () => printWindow.close(), { once: true });
+    image.src = dataUrl;
+    return;
+  }
+
+  printBoothStripInFrame(dataUrl);
+}
+
+function writeBoothPrintDocument(documentRef) {
+  documentRef.open();
+  documentRef.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <title>Photo Booth Print</title>
+        <style>
+          @page { margin: 0; size: auto; }
+          * { box-sizing: border-box; }
+          html, body {
+            margin: 0;
+            min-height: 100%;
+            background: #fff;
+          }
+          body {
+            display: grid;
+            min-height: 100vh;
+            place-items: center;
+            padding: 8mm;
+          }
+          img {
+            display: block;
+            width: auto;
+            max-width: 100%;
+            max-height: calc(100vh - 16mm);
+            object-fit: contain;
+          }
+          @media print {
+            body {
+              min-height: 100vh;
+              padding: 0;
+            }
+            img {
+              max-height: 100vh;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <img id="boothPrintImage" alt="Photo Booth Print" />
+      </body>
+    </html>
   `);
-  printWindow.document.close();
+  documentRef.close();
+}
+
+function printBoothStripInFrame(dataUrl) {
+  const frame = document.createElement("iframe");
+  frame.title = "Photo Booth Print";
+  frame.style.position = "fixed";
+  frame.style.right = "0";
+  frame.style.bottom = "0";
+  frame.style.width = "1px";
+  frame.style.height = "1px";
+  frame.style.border = "0";
+  frame.style.opacity = "0";
+  frame.style.pointerEvents = "none";
+  document.body.appendChild(frame);
+
+  const printFrameWindow = frame.contentWindow;
+  const printFrameDocument = frame.contentDocument || printFrameWindow?.document;
+  if (!printFrameWindow || !printFrameDocument) {
+    frame.remove();
+    setBoothStatus("เปิดหน้าพิมพ์ไม่สำเร็จ");
+    return;
+  }
+
+  writeBoothPrintDocument(printFrameDocument);
+  const image = printFrameDocument.getElementById("boothPrintImage");
+  const cleanup = () => window.setTimeout(() => frame.remove(), 1000);
+  printFrameWindow.addEventListener("afterprint", cleanup, { once: true });
+  image.onload = () => {
+    window.setTimeout(() => {
+      printFrameWindow.focus();
+      printFrameWindow.print();
+      setBoothStatus("เปิดหน้าพิมพ์แล้ว");
+      window.setTimeout(cleanup, 60000);
+    }, 250);
+  };
+  image.onerror = () => {
+    cleanup();
+    setBoothStatus("โหลดภาพสำหรับพิมพ์ไม่สำเร็จ");
+  };
+  image.src = dataUrl;
 }
 
 async function generateBoothGif(options = {}) {
