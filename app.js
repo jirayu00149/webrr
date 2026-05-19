@@ -122,6 +122,7 @@ let boothWatchTimer = null;
 let boothSeenImportFiles = new Set();
 let boothPendingAutoFiles = [];
 let boothAutoImportBusy = false;
+let boothGifWorkerUrl = "";
 
 document.addEventListener("DOMContentLoaded", init);
 
@@ -1590,23 +1591,41 @@ async function generateBoothGif(options = {}) {
   }
 
   setBoothStatus("กำลังสร้าง GIF แบบเร็ว...");
-  const gif = new window.GIF({
-    workers: 1,
-    quality: 20,
-    width: BOOTH_GIF_WIDTH,
-    height: BOOTH_GIF_HEIGHT,
-    workerScript: "https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js"
-  });
+  let gif;
+  try {
+    gif = new window.GIF({
+      workers: 1,
+      quality: 20,
+      width: BOOTH_GIF_WIDTH,
+      height: BOOTH_GIF_HEIGHT,
+      workerScript: getBoothGifWorkerScript()
+    });
+  } catch (error) {
+    console.error(error);
+    setBoothStatus("สร้าง GIF ไม่สำเร็จ เพราะ browser บล็อก worker ลองรีเฟรชหน้าแล้วกดสร้างใหม่");
+    return null;
+  }
 
   boothShots.forEach((shot) => {
     const frame = makeBoothGifFrameCanvas(shot);
     gif.addFrame(frame, { delay: 720, copy: true });
   });
 
-  const blob = await new Promise((resolve) => {
-    gif.on("finished", resolve);
-    gif.render();
-  });
+  let blob;
+  try {
+    blob = await new Promise((resolve, reject) => {
+      gif.on("finished", resolve);
+      try {
+        gif.render();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    setBoothStatus("สร้าง GIF ไม่สำเร็จ ลองรีเฟรชหน้าแล้วกดสร้างใหม่");
+    return null;
+  }
   boothLastGifBlob = blob;
 
   if (options.download) {
@@ -1614,6 +1633,17 @@ async function generateBoothGif(options = {}) {
   }
   setBoothStatus("สร้าง GIF สำเร็จ");
   return blob;
+}
+
+function getBoothGifWorkerScript() {
+  if (!boothGifWorkerUrl) {
+    const source =
+      'importScripts("https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js");';
+    boothGifWorkerUrl = URL.createObjectURL(
+      new Blob([source], { type: "text/javascript" })
+    );
+  }
+  return boothGifWorkerUrl;
 }
 
 function makeBoothGifFrameCanvas(shot) {
@@ -1689,16 +1719,22 @@ async function uploadBoothStrip() {
     const stripFile = new File([stripBlob], makeBoothFileName("jpg"), { type: "image/jpeg" });
     await uploadBoothFile(stripFile, activity, "photobooth-strip");
 
+    let gifUploaded = false;
     const gifBlob = await generateBoothGif({ download: false });
     if (gifBlob) {
       const gifFile = new File([gifBlob], makeBoothFileName("gif"), { type: "image/gif" });
       const firstFrameBlob = await canvasToBlob(makeBoothGifFrameCanvas(boothShots[0]), "image/jpeg", 0.9);
       await uploadBoothFile(gifFile, activity, "photobooth-gif", firstFrameBlob);
+      gifUploaded = true;
     }
 
     await loadActivityIndex();
     await loadAdminPhotos();
-    setBoothStatus("อัปโหลดโฟโต้บูธและ GIF เข้า Drive แล้ว");
+    setBoothStatus(
+      gifUploaded
+        ? "อัปโหลดโฟโต้บูธและ GIF เข้า Drive แล้ว"
+        : "อัปโหลดโฟโต้บูธเข้า Drive แล้ว แต่ GIF ยังสร้างไม่สำเร็จ"
+    );
     return true;
   } catch (error) {
     console.error(error);
