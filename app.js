@@ -1,6 +1,8 @@
 const MODEL_URL = "https://justadudewhohacks.github.io/face-api.js/models";
 const DEFAULT_THRESHOLD = 0.52;
 const BOOTH_REQUIRED_SHOTS = 3;
+const BOOTH_GIF_WIDTH = 640;
+const BOOTH_GIF_HEIGHT = 360;
 
 const page = document.body.dataset.page || "user";
 const $ = (selector) => document.querySelector(selector);
@@ -298,7 +300,7 @@ async function handleLogin(event) {
       return;
     }
 
-    window.location.href = "/admin.html";
+    window.location.href = "/admin.html#uploadPanel";
   } catch {
     setLoginError("เชื่อมต่อ server ไม่สำเร็จ");
   }
@@ -1587,18 +1589,18 @@ async function generateBoothGif(options = {}) {
     return null;
   }
 
-  setBoothStatus("กำลังสร้าง GIF...");
+  setBoothStatus("กำลังสร้าง GIF แบบเร็ว...");
   const gif = new window.GIF({
-    workers: 2,
-    quality: 10,
-    width: 960,
-    height: 540,
+    workers: 1,
+    quality: 20,
+    width: BOOTH_GIF_WIDTH,
+    height: BOOTH_GIF_HEIGHT,
     workerScript: "https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js"
   });
 
   boothShots.forEach((shot) => {
     const frame = makeBoothGifFrameCanvas(shot);
-    gif.addFrame(frame, { delay: 780 });
+    gif.addFrame(frame, { delay: 720, copy: true });
   });
 
   const blob = await new Promise((resolve) => {
@@ -1616,15 +1618,22 @@ async function generateBoothGif(options = {}) {
 
 function makeBoothGifFrameCanvas(shot) {
   const canvas = document.createElement("canvas");
-  canvas.width = 960;
-  canvas.height = 540;
+  canvas.width = BOOTH_GIF_WIDTH;
+  canvas.height = BOOTH_GIF_HEIGHT;
   const ctx = canvas.getContext("2d");
   const frameColor = els.boothFrameColorInput?.value || "#ffffff";
   const textColor = els.boothTextColorInput?.value || "#ffffff";
   const accentColor = els.boothAccentColorInput?.value || "#ec4899";
   const photoFit = els.boothFitSelect?.value || "cover";
   const photoScale = Number(els.boothPhotoScaleInput?.value || 100) / 100;
-  const slot = { x: 76, y: 64, w: 808, h: 398 };
+  const slot = {
+    x: Math.round(canvas.width * 0.079),
+    y: Math.round(canvas.height * 0.119),
+    w: Math.round(canvas.width * 0.842),
+    h: Math.round(canvas.height * 0.737)
+  };
+  const framePad = Math.max(6, Math.round(canvas.width * 0.01));
+  const edge = Math.max(6, Math.round(canvas.height * 0.018));
 
   fillBoothBackground(ctx, canvas.width, canvas.height);
   if (boothOverlayImage) {
@@ -1635,10 +1644,17 @@ function makeBoothGifFrameCanvas(shot) {
   }
 
   ctx.fillStyle = accentColor;
-  ctx.fillRect(0, 0, canvas.width, 10);
-  ctx.fillRect(0, canvas.height - 10, canvas.width, 10);
+  ctx.fillRect(0, 0, canvas.width, edge);
+  ctx.fillRect(0, canvas.height - edge, canvas.width, edge);
   ctx.fillStyle = frameColor;
-  roundRect(ctx, slot.x - 10, slot.y - 10, slot.w + 20, slot.h + 20, 12);
+  roundRect(
+    ctx,
+    slot.x - framePad,
+    slot.y - framePad,
+    slot.w + framePad * 2,
+    slot.h + framePad * 2,
+    Math.max(8, framePad)
+  );
   ctx.fill();
   ctx.fillStyle = "#050816";
   ctx.fillRect(slot.x, slot.y, slot.w, slot.h);
@@ -1646,9 +1662,9 @@ function makeBoothGifFrameCanvas(shot) {
   drawBoothImageWatermark(ctx, slot);
 
   ctx.fillStyle = textColor;
-  ctx.font = "800 24px Segoe UI, sans-serif";
+  ctx.font = `800 ${Math.max(16, Math.round(canvas.width * 0.025))}px Segoe UI, sans-serif`;
   ctx.textAlign = "center";
-  ctx.fillText("PHOTO BSS", canvas.width / 2, canvas.height - 34);
+  ctx.fillText("PHOTO BSS", canvas.width / 2, canvas.height - Math.round(canvas.height * 0.063));
   return canvas;
 }
 
