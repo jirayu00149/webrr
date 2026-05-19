@@ -31,9 +31,14 @@
             <small>Admin upload</small>
           </span>
         </a>
-        <button class="secondary-button small-button" id="logoutBtn" type="button">
-          Logout
-        </button>
+        <div class="nav-actions">
+          <a class="secondary-button small-button" id="boothNavLink" href="#photoBoothPanel">
+            Photo Booth
+          </a>
+          <button class="secondary-button small-button" id="logoutBtn" type="button">
+            Logout
+          </button>
+        </div>
       </div>
     </header>
 
@@ -104,7 +109,7 @@
         <div class="activity-list" id="activityList" aria-live="polite"></div>
       </section>
 
-      <section class="panel photobooth-panel">
+      <section class="panel photobooth-panel" id="photoBoothPanel">
         <div class="panel-header">
           <div>
             <p class="eyebrow">Photo booth</p>
@@ -134,6 +139,15 @@
               <input id="boothImportInput" type="file" accept="image/*" multiple hidden />
             </div>
             <div class="booth-shot-list" id="boothShotList" aria-live="polite"></div>
+            <details class="lr-help">
+              <summary>วิธีนำเข้าจาก Lr</summary>
+              <ol>
+                <li>แต่งรูปใน Lightroom ให้เสร็จ</li>
+                <li>Export เป็น JPG ขนาดประมาณ 2000px ด้านยาว</li>
+                <li>เลือกครบ 3 รูปของ 1 เซ็ต แล้วลากลงเว็บหรือกด “นำเข้าจาก Lr”</li>
+                <li>เว็บจะเริ่มเซ็ตใหม่และใส่ 3 รูปเข้าเฟรมให้อัตโนมัติ</li>
+              </ol>
+            </details>
           </div>
 
           <div class="booth-preview-card">
@@ -159,6 +173,27 @@
           </div>
 
           <div class="booth-style-panel">
+            <label>
+              เลย์เอาท์
+              <select id="boothLayoutSelect" class="select-input">
+                <option value="strip">Classic Strip 3 รูป</option>
+                <option value="poster">Poster 1+2 รูป</option>
+                <option value="wide">Wide Card 3 รูป</option>
+              </select>
+            </label>
+            <div class="booth-color-grid">
+              <label>
+                Fit รูป
+                <select id="boothFitSelect" class="select-input">
+                  <option value="cover">เต็มช่อง</option>
+                  <option value="contain">เห็นทั้งรูป</option>
+                </select>
+              </label>
+              <label>
+                ขนาดรูป
+                <input id="boothPhotoScaleInput" type="range" min="90" max="130" value="100" />
+              </label>
+            </div>
             <label>
               หัวข้อบนเฟรม
               <input id="boothTitleInput" type="text" value="BSS PHOTO BOOTH" />
@@ -194,9 +229,14 @@
               <input id="boothLogoInput" type="file" accept="image/*" />
             </label>
             <label>
+              ขนาดโลโก้
+              <input id="boothLogoSizeInput" type="range" min="60" max="240" value="128" />
+            </label>
+            <label>
               ภาพพื้นหลัง/ลายเฟรม
               <input id="boothOverlayInput" type="file" accept="image/*" />
             </label>
+            <p class="small-note">ลากโลโก้บนภาพตัวอย่างเพื่อวางตำแหน่งเองได้</p>
           </div>
         </div>
       </section>

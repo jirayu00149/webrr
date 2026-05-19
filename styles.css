@@ -103,6 +103,13 @@ h2 {
   gap: 18px;
 }
 
+.nav-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
 .brand {
   display: inline-flex;
   align-items: center;
@@ -1280,6 +1287,12 @@ body.viewer-open {
 
 .photobooth-panel {
   margin-top: 18px;
+  scroll-margin-top: 96px;
+}
+
+.photobooth-panel.dragging {
+  outline: 3px solid rgba(21, 94, 239, 0.45);
+  outline-offset: 5px;
 }
 
 .photobooth-layout {
@@ -1373,12 +1386,20 @@ body.viewer-open {
 
 .booth-preview-card canvas {
   display: block;
-  width: min(100%, 320px);
+  width: auto;
+  max-width: min(100%, 380px);
+  max-height: min(72vh, 760px);
   height: auto;
   margin: 0 auto;
   border-radius: 4px;
   background: #101828;
   box-shadow: var(--shadow);
+  cursor: grab;
+  touch-action: none;
+}
+
+.booth-preview-card canvas:active {
+  cursor: grabbing;
 }
 
 .booth-style-panel {
@@ -1394,7 +1415,9 @@ body.viewer-open {
 }
 
 .booth-style-panel input[type="text"],
-.booth-style-panel input[type="file"] {
+.booth-style-panel input[type="file"],
+.booth-style-panel input[type="range"],
+.booth-style-panel select {
   width: 100%;
   min-height: 42px;
   border: 1px solid var(--line);
@@ -1404,6 +1427,11 @@ body.viewer-open {
   color: var(--ink);
   font: inherit;
   font-weight: 700;
+}
+
+.booth-style-panel input[type="range"] {
+  padding: 0;
+  accent-color: var(--primary);
 }
 
 .booth-color-grid {
@@ -1419,6 +1447,28 @@ body.viewer-open {
   border-radius: var(--radius);
   background: #fff;
   padding: 4px;
+}
+
+.lr-help {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  padding: 10px 12px;
+}
+
+.lr-help summary {
+  cursor: pointer;
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.lr-help ol {
+  margin: 10px 0 0;
+  padding-left: 22px;
+  color: var(--muted);
+  font-size: 0.94rem;
+  line-height: 1.55;
 }
 
 .gallery-link-panel {
@@ -1488,6 +1538,23 @@ body.viewer-open {
     width: 100%;
   }
 
+  .admin-nav {
+    flex-wrap: nowrap;
+  }
+
+  .admin-nav .brand {
+    width: auto;
+    min-width: 0;
+  }
+
+  .admin-nav .brand small {
+    display: none;
+  }
+
+  .admin-nav .nav-actions {
+    gap: 6px;
+  }
+
   .portal-hero,
   .page-hero,
   .admin-grid,
@@ -1523,6 +1590,18 @@ body.viewer-open {
   .nav-links,
   .model-state {
     width: 100%;
+  }
+
+  .admin-nav .brand {
+    width: auto;
+  }
+
+  .admin-nav {
+    flex-wrap: nowrap;
+  }
+
+  .admin-nav .nav-actions {
+    margin-left: auto;
   }
 
   .nav-links {
