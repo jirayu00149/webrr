@@ -1432,12 +1432,6 @@ body.viewer-open {
   border-radius: 4px;
   background: #101828;
   box-shadow: var(--shadow);
-  cursor: grab;
-  touch-action: none;
-}
-
-.booth-preview-card canvas:active {
-  cursor: grabbing;
 }
 
 .booth-style-panel {

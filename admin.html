@@ -32,7 +32,7 @@
           </span>
         </a>
         <div class="nav-actions">
-          <a class="secondary-button small-button" href="#adminHome">
+          <a class="secondary-button small-button" href="index.html">
             HOME
           </a>
           <a class="secondary-button small-button" href="#uploadPanel">
@@ -214,14 +214,18 @@
               ข้อความล่างเฟรม
               <input id="boothSubtitleInput" type="text" value="School memories" />
             </label>
-            <label>
-              ลายน้ำ
-              <input id="boothWatermarkInput" type="text" value="PHOTO BSS" />
-            </label>
             <div class="booth-color-grid">
               <label>
-                พื้นหลัง
+                พื้นหลัง 1
                 <input id="boothBgColorInput" type="color" value="#111827" />
+              </label>
+              <label>
+                พื้นหลัง 2
+                <input id="boothBgColor2Input" type="color" value="#312e81" />
+              </label>
+              <label>
+                พื้นหลัง 3
+                <input id="boothBgColor3Input" type="color" value="#0f766e" />
               </label>
               <label>
                 กรอบรูป
@@ -237,18 +241,18 @@
               </label>
             </div>
             <label>
-              โลโก้/ภาพลายน้ำ
+              ไฟล์ลายน้ำมุมขวาบน
               <input id="boothLogoInput" type="file" accept="image/*" />
             </label>
             <label>
-              ขนาดโลโก้
+              ขนาดลายน้ำ
               <input id="boothLogoSizeInput" type="range" min="60" max="240" value="128" />
             </label>
             <label>
               ภาพพื้นหลัง/ลายเฟรม
               <input id="boothOverlayInput" type="file" accept="image/*" />
             </label>
-            <p class="small-note">ลากโลโก้บนภาพตัวอย่างเพื่อวางตำแหน่งเองได้</p>
+            <p class="small-note">ลายน้ำรูปภาพจะถูกวางที่มุมขวาบนของรูปทุกใบก่อนบันทึกลง Drive</p>
           </div>
         </div>
       </section>
