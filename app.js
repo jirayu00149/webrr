@@ -68,6 +68,10 @@ const els = {
   boothCaptureBtn: $("#boothCaptureBtn"),
   boothImportBtn: $("#boothImportBtn"),
   boothImportInput: $("#boothImportInput"),
+  boothWatchFolderBtn: $("#boothWatchFolderBtn"),
+  boothStopWatchBtn: $("#boothStopWatchBtn"),
+  boothAutoUploadCheck: $("#boothAutoUploadCheck"),
+  boothWatchState: $("#boothWatchState"),
   boothShotList: $("#boothShotList"),
   boothStripCanvas: $("#boothStripCanvas"),
   boothNavLink: $("#boothNavLink"),
@@ -113,6 +117,11 @@ let boothSetId = Date.now().toString(36);
 let boothLogoPosition = { x: 0.5, y: 0.91 };
 let boothLogoBox = null;
 let boothDraggingLogo = false;
+let boothWatchHandle = null;
+let boothWatchTimer = null;
+let boothSeenImportFiles = new Set();
+let boothPendingAutoFiles = [];
+let boothAutoImportBusy = false;
 
 document.addEventListener("DOMContentLoaded", init);
 
@@ -141,6 +150,9 @@ async function init() {
       setModelStatus("ready", "โมเดลพร้อมใช้งาน");
       setStatus(getReadyMessage());
       updateSearchButton();
+      if (page === "admin") {
+        await processBoothAutoImportQueue();
+      }
     }
   } catch (error) {
     console.error(error);
@@ -164,6 +176,9 @@ function bindEvents() {
     importBoothShots(event.target.files);
     event.target.value = "";
   });
+  els.boothWatchFolderBtn?.addEventListener("click", connectBoothLrFolder);
+  els.boothStopWatchBtn?.addEventListener("click", stopBoothLrWatch);
+  els.boothAutoUploadCheck?.addEventListener("change", processBoothAutoImportQueue);
   els.boothClearBtn?.addEventListener("click", clearBoothShots);
   els.boothDownloadBtn?.addEventListener("click", downloadBoothStrip);
   els.boothPrintBtn?.addEventListener("click", printBoothStrip);
@@ -206,6 +221,7 @@ function bindEvents() {
     updateDeleteActivityButton();
     renderSelectedActivityDriveLink();
     loadAdminPhotos();
+    processBoothAutoImportQueue();
   });
 
   els.activityFilter?.addEventListener("change", () => {
@@ -1120,10 +1136,12 @@ async function captureBoothShot() {
 }
 
 async function importBoothShots(fileList) {
-  const files = Array.from(fileList || []).filter((file) => file.type.startsWith("image/"));
+  const files = Array.from(fileList || []).filter(
+    (file) => file.type.startsWith("image/") || isBoothImportFile(file.name)
+  );
   if (!files.length) {
     setBoothStatus("ไม่พบไฟล์รูปจาก Lr/export");
-    return;
+    return false;
   }
 
   startNewBoothSet();
@@ -1140,6 +1158,145 @@ async function importBoothShots(fileList) {
 
   if (files.length > BOOTH_REQUIRED_SHOTS) {
     setBoothStatus(`ใช้ 3 รูปแรกเป็น 1 เซ็ตแล้ว เหลือ ${files.length - BOOTH_REQUIRED_SHOTS} รูปให้ทำเซ็ตถัดไป`);
+  }
+
+  return true;
+}
+
+async function connectBoothLrFolder() {
+  if (!window.showDirectoryPicker) {
+    setBoothWatchState("ใช้ Chrome หรือ Edge บน HTTPS/localhost เพื่อเชื่อมโฟลเดอร์ Lr อัตโนมัติ");
+    setBoothStatus("เบราว์เซอร์นี้ยังไม่รองรับการเฝ้าดูโฟลเดอร์ Lr ให้ใช้ปุ่มนำเข้าจาก Lr แทน");
+    return;
+  }
+
+  try {
+    boothWatchHandle = await window.showDirectoryPicker({ mode: "read" });
+    boothSeenImportFiles = new Set();
+    boothPendingAutoFiles = [];
+    if (boothWatchTimer) {
+      window.clearInterval(boothWatchTimer);
+    }
+    updateBoothWatchButtons(true);
+    setBoothWatchState(`เชื่อมโฟลเดอร์ "${boothWatchHandle.name}" แล้ว กำลังรอรูปจาก Lr`);
+    await scanBoothLrFolder();
+    boothWatchTimer = window.setInterval(scanBoothLrFolder, 2500);
+  } catch (error) {
+    if (error?.name !== "AbortError") {
+      console.error(error);
+      setBoothWatchState("เชื่อมโฟลเดอร์ Lr ไม่สำเร็จ");
+    }
+  }
+}
+
+function stopBoothLrWatch() {
+  if (boothWatchTimer) {
+    window.clearInterval(boothWatchTimer);
+    boothWatchTimer = null;
+  }
+  boothWatchHandle = null;
+  boothPendingAutoFiles = [];
+  updateBoothWatchButtons(false);
+  setBoothWatchState("หยุด Auto Import จาก Lr แล้ว");
+}
+
+async function scanBoothLrFolder() {
+  if (!boothWatchHandle) {
+    return;
+  }
+
+  try {
+    const newFiles = [];
+    for await (const [, handle] of boothWatchHandle.entries()) {
+      if (handle.kind !== "file" || !isBoothImportFile(handle.name)) {
+        continue;
+      }
+      const file = await handle.getFile();
+      const fileKey = `${file.name}:${file.lastModified}:${file.size}`;
+      if (boothSeenImportFiles.has(fileKey)) {
+        continue;
+      }
+      boothSeenImportFiles.add(fileKey);
+      newFiles.push(file);
+    }
+
+    if (!newFiles.length) {
+      return;
+    }
+
+    newFiles.sort((a, b) => a.lastModified - b.lastModified || a.name.localeCompare(b.name));
+    boothPendingAutoFiles.push(...newFiles);
+    setBoothWatchState(
+      `เจอรูปใหม่ ${newFiles.length} รูป รอเข้าชุด ${boothPendingAutoFiles.length}/${BOOTH_REQUIRED_SHOTS}`
+    );
+    await processBoothAutoImportQueue();
+  } catch (error) {
+    console.error(error);
+    setBoothWatchState("อ่านโฟลเดอร์ Lr ไม่สำเร็จ ลองเชื่อมโฟลเดอร์ใหม่");
+  }
+}
+
+async function processBoothAutoImportQueue() {
+  if (boothAutoImportBusy) {
+    return;
+  }
+
+  boothAutoImportBusy = true;
+  try {
+    while (boothPendingAutoFiles.length >= BOOTH_REQUIRED_SHOTS) {
+      const autoUpload = Boolean(els.boothAutoUploadCheck?.checked);
+      if (!autoUpload && boothShots.length) {
+        setBoothWatchState(
+          `มีรูปค้าง ${boothPendingAutoFiles.length} รูป ล้างหรืออัปโหลดเซ็ตปัจจุบันก่อนเพื่อดึงชุดถัดไป`
+        );
+        break;
+      }
+
+      const files = boothPendingAutoFiles.splice(0, BOOTH_REQUIRED_SHOTS);
+      await importBoothShots(files);
+      if (!autoUpload) {
+        setBoothWatchState(
+          boothPendingAutoFiles.length
+            ? `นำเข้า 1 เซ็ตแล้ว เหลือรูปค้าง ${boothPendingAutoFiles.length} รูป`
+            : "นำเข้า 1 เซ็ตจาก Lr แล้ว"
+        );
+        break;
+      }
+
+      const uploaded = await uploadBoothStrip();
+      if (!uploaded) {
+        boothPendingAutoFiles.unshift(...files);
+        setBoothWatchState("ยังอัปโหลดอัตโนมัติไม่ได้ เลือกโฟลเดอร์กิจกรรมและรอโมเดลพร้อมก่อน");
+        break;
+      }
+      startNewBoothSet();
+      setBoothWatchState(
+        boothPendingAutoFiles.length
+          ? `อัปโหลด 1 เซ็ตแล้ว เหลือรูปค้าง ${boothPendingAutoFiles.length} รูป`
+          : "อัปโหลดเซ็ตล่าสุดจาก Lr แล้ว พร้อมรอเซ็ตถัดไป"
+      );
+    }
+  } finally {
+    boothAutoImportBusy = false;
+  }
+}
+
+function isBoothImportFile(fileName) {
+  return /\.(jpe?g|png|webp)$/i.test(fileName || "");
+}
+
+function updateBoothWatchButtons(isWatching) {
+  if (els.boothWatchFolderBtn) {
+    els.boothWatchFolderBtn.disabled = isWatching;
+  }
+  if (els.boothStopWatchBtn) {
+    els.boothStopWatchBtn.disabled = !isWatching;
+  }
+}
+
+function setBoothWatchState(message) {
+  if (els.boothWatchState) {
+    els.boothWatchState.textContent = message;
   }
 }
 
@@ -1168,6 +1325,7 @@ function clearBoothShots() {
   renderBoothShotList();
   renderBoothStrip();
   setBoothStatus("ล้างรูปแล้ว พร้อมถ่ายชุดใหม่");
+  processBoothAutoImportQueue();
 }
 
 function renderBoothShotList() {
@@ -1464,7 +1622,7 @@ function makeBoothGifFrameCanvas(shot) {
 async function uploadBoothStrip() {
   if (!modelsReady) {
     setBoothStatus("รอโมเดลตรวจจับใบหน้าพร้อมก่อน");
-    return;
+    return false;
   }
 
   const activityId = els.activitySelect?.value;
@@ -1472,7 +1630,7 @@ async function uploadBoothStrip() {
   if (!activity) {
     setBoothStatus("เลือกโฟลเดอร์กิจกรรมก่อนอัปโหลด");
     els.activitySelect?.focus();
-    return;
+    return false;
   }
 
   try {
@@ -1492,13 +1650,15 @@ async function uploadBoothStrip() {
     await loadActivityIndex();
     await loadAdminPhotos();
     setBoothStatus("อัปโหลดโฟโต้บูธและ GIF เข้า Drive แล้ว");
+    return true;
   } catch (error) {
     console.error(error);
     if (error.message === "UNAUTHORIZED") {
       window.location.href = "/admin.html";
-      return;
+      return false;
     }
     setBoothStatus(error.message || "อัปโหลดโฟโต้บูธไม่สำเร็จ");
+    return false;
   } finally {
     updateBoothButtons();
   }

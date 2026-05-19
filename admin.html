@@ -32,8 +32,14 @@
           </span>
         </a>
         <div class="nav-actions">
+          <a class="secondary-button small-button" href="#adminHome">
+            HOME
+          </a>
+          <a class="secondary-button small-button" href="#uploadPanel">
+            UPLOAD
+          </a>
           <a class="secondary-button small-button" id="boothNavLink" href="#photoBoothPanel">
-            Photo Booth
+            PHOTO BOOTH
           </a>
           <button class="secondary-button small-button" id="logoutBtn" type="button">
             Logout
@@ -43,7 +49,7 @@
     </header>
 
     <main class="app-shell page-layout admin-only-layout">
-      <section class="page-hero admin-upload-hero">
+      <section class="page-hero admin-upload-hero" id="adminHome">
         <div>
           <p class="eyebrow">Admin only</p>
           <h1>จัดการรูปกิจกรรม</h1>
@@ -138,16 +144,22 @@
               </button>
               <input id="boothImportInput" type="file" accept="image/*" multiple hidden />
             </div>
+            <div class="booth-auto-import">
+              <div class="button-row">
+                <button class="secondary-button small-button" id="boothWatchFolderBtn" type="button">
+                  เชื่อมโฟลเดอร์ Lr
+                </button>
+                <button class="ghost-button small-button" id="boothStopWatchBtn" type="button" disabled>
+                  หยุด Auto
+                </button>
+              </div>
+              <label class="booth-auto-check">
+                <input id="boothAutoUploadCheck" type="checkbox" />
+                อัปโหลดเข้า Drive อัตโนมัติเมื่อครบ 3 รูป
+              </label>
+              <p class="small-note" id="boothWatchState">ยังไม่ได้เชื่อมโฟลเดอร์ Export จาก Lr</p>
+            </div>
             <div class="booth-shot-list" id="boothShotList" aria-live="polite"></div>
-            <details class="lr-help">
-              <summary>วิธีนำเข้าจาก Lr</summary>
-              <ol>
-                <li>แต่งรูปใน Lightroom ให้เสร็จ</li>
-                <li>Export เป็น JPG ขนาดประมาณ 2000px ด้านยาว</li>
-                <li>เลือกครบ 3 รูปของ 1 เซ็ต แล้วลากลงเว็บหรือกด “นำเข้าจาก Lr”</li>
-                <li>เว็บจะเริ่มเซ็ตใหม่และใส่ 3 รูปเข้าเฟรมให้อัตโนมัติ</li>
-              </ol>
-            </details>
           </div>
 
           <div class="booth-preview-card">
@@ -241,7 +253,7 @@
         </div>
       </section>
 
-      <section class="panel upload-panel admin-upload-panel">
+      <section class="panel upload-panel admin-upload-panel" id="uploadPanel">
         <div class="panel-header">
           <div>
             <p class="eyebrow">Upload</p>

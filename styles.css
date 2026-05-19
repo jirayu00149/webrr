@@ -110,6 +110,10 @@ h2 {
   margin-left: auto;
 }
 
+.nav-actions .small-button {
+  white-space: nowrap;
+}
+
 .brand {
   display: inline-flex;
   align-items: center;
@@ -1283,10 +1287,15 @@ body.viewer-open {
 
 .admin-upload-panel {
   margin-top: 18px;
+  scroll-margin-top: 96px;
 }
 
 .photobooth-panel {
   margin-top: 18px;
+  scroll-margin-top: 96px;
+}
+
+#adminHome {
   scroll-margin-top: 96px;
 }
 
@@ -1339,6 +1348,35 @@ body.viewer-open {
 .booth-camera-controls .select-input {
   flex: 1 1 220px;
   min-width: 0;
+}
+
+.booth-auto-import {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-tint);
+  padding: 12px;
+}
+
+.booth-auto-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.booth-auto-check input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  accent-color: var(--primary);
+}
+
+.booth-auto-import .small-note {
+  margin: 0;
 }
 
 .booth-shot-list {
@@ -1449,28 +1487,6 @@ body.viewer-open {
   padding: 4px;
 }
 
-.lr-help {
-  margin-top: 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: #fff;
-  padding: 10px 12px;
-}
-
-.lr-help summary {
-  cursor: pointer;
-  color: var(--ink);
-  font-weight: 900;
-}
-
-.lr-help ol {
-  margin: 10px 0 0;
-  padding-left: 22px;
-  color: var(--muted);
-  font-size: 0.94rem;
-  line-height: 1.55;
-}
-
 .gallery-link-panel {
   margin-top: 18px;
 }
@@ -1553,6 +1569,8 @@ body.viewer-open {
 
   .admin-nav .nav-actions {
     gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 2px;
   }
 
   .portal-hero,
@@ -1602,6 +1620,7 @@ body.viewer-open {
 
   .admin-nav .nav-actions {
     margin-left: auto;
+    max-width: 100%;
   }
 
   .nav-links {
