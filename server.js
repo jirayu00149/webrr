@@ -194,7 +194,7 @@ async function handleApi(request, response, url) {
   if (url.pathname === "/api/admin/login" && request.method === "POST") {
     const isFormLogin = isFormRequest(request);
     const body = await readLoginBody(request, 32 * 1024);
-    if (!body || !isValidAdminPassword(String(body.password || ""))) {
+    if (!body || !isValidAdminPassword(String(body.password || "").trim())) {
       if (isFormLogin) {
         redirect(response, "/admin.html?login=failed");
         return;

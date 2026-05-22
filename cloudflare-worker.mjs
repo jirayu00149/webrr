@@ -128,7 +128,7 @@ async function handleApi(request, env, url) {
       : await request.json().catch(() => ({}));
     const password = env.ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD;
 
-    if (!isValidAdminPassword(String(body.password || ""), password)) {
+    if (!isValidAdminPassword(String(body.password || "").trim(), password)) {
       if (isFormLogin) {
         return Response.redirect(`${url.origin}/admin.html?login=failed`, 302);
       }
