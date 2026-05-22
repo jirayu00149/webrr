@@ -7,7 +7,8 @@ const crypto = require("crypto");
 
 const root = __dirname;
 const port = Number(process.env.PORT || 8080);
-const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
+const defaultAdminPassword = "admin123";
+const adminPassword = process.env.ADMIN_PASSWORD || defaultAdminPassword;
 const dataDir = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
   : path.join(root, "data");
@@ -23,7 +24,7 @@ const googleDriveRuntimeConfigFile = path.join(dataDir, "google-drive-config.jso
 const googlePhotosOAuthStateCookie = "sff_google_photos_state";
 const googleDriveOAuthStateCookie = "sff_google_drive_state";
 const googlePhotosScope = "https://www.googleapis.com/auth/photoslibrary.appendonly";
-const googleDriveScope = "https://www.googleapis.com/auth/drive.file";
+const googleDriveScope = "https://www.googleapis.com/auth/drive";
 const defaultActivity = {
   id: "general",
   name: "รวมกิจกรรม",
@@ -193,7 +194,7 @@ async function handleApi(request, response, url) {
   if (url.pathname === "/api/admin/login" && request.method === "POST") {
     const isFormLogin = isFormRequest(request);
     const body = await readLoginBody(request, 32 * 1024);
-    if (!body || !safeEqual(String(body.password || ""), adminPassword)) {
+    if (!body || !isValidAdminPassword(String(body.password || ""))) {
       if (isFormLogin) {
         redirect(response, "/admin.html?login=failed");
         return;
@@ -922,9 +923,14 @@ function getGoogleDriveConfig() {
       fileConfig.folderUrl ||
       ""
   );
+  const refreshTokenFromRuntime = Boolean(runtimeConfig.refreshToken || runtimeConfig.refresh_token);
+  const tokenScope = runtimeConfig.scope || runtimeConfig.driveScope || fileConfig.scope || fileConfig.driveScope || "";
+  const oauthNeedsReconnect = Boolean(
+    refreshToken && refreshTokenFromRuntime && tokenScope !== googleDriveScope
+  );
   const enabled = boolFrom(
     process.env.GOOGLE_DRIVE_ENABLED ?? runtimeConfig.enabled,
-    Boolean(folderId && ((clientId && clientSecret && refreshToken) || serviceAccount))
+    Boolean(folderId && ((clientId && clientSecret && refreshToken && !oauthNeedsReconnect) || serviceAccount))
   );
 
   return {
@@ -936,9 +942,18 @@ function getGoogleDriveConfig() {
     folderId,
     folderUrl: folderId ? `https://drive.google.com/drive/folders/${folderId}` : "",
     oauthConfigured: Boolean(clientId && clientSecret),
-    connected: Boolean(refreshToken),
-    authMode: refreshToken ? "oauth" : clientId && clientSecret ? "oauth_pending" : serviceAccount ? "service_account" : "none",
-    configured: Boolean(folderId && ((clientId && clientSecret && refreshToken) || (!clientId && !clientSecret && serviceAccount)))
+    connected: Boolean(refreshToken && !oauthNeedsReconnect),
+    authMode: refreshToken
+      ? oauthNeedsReconnect
+        ? "oauth_needs_reconnect"
+        : "oauth"
+      : clientId && clientSecret
+        ? "oauth_pending"
+        : serviceAccount
+          ? "service_account"
+          : "none",
+    configured: Boolean(folderId && ((clientId && clientSecret && refreshToken && !oauthNeedsReconnect) || (!clientId && !clientSecret && serviceAccount))),
+    scope: googleDriveScope
   };
 }
 
@@ -2154,6 +2169,7 @@ async function exchangeGoogleDriveCode(config, code, redirectUri) {
 async function saveGoogleDriveRefreshToken(refreshToken) {
   const next = readJsonFileSync(googleDriveRuntimeConfigFile);
   next.refreshToken = refreshToken;
+  next.scope = googleDriveScope;
   await fsp.mkdir(dataDir, { recursive: true });
   await fsp.writeFile(googleDriveRuntimeConfigFile, `${JSON.stringify(next, null, 2)}\n`, "utf8");
 }
@@ -2831,6 +2847,13 @@ function safeEqual(input, expected) {
   const left = Buffer.from(input);
   const right = Buffer.from(expected);
   return left.length === right.length && crypto.timingSafeEqual(left, right);
+}
+
+function isValidAdminPassword(input) {
+  return (
+    safeEqual(input, adminPassword) ||
+    (adminPassword !== defaultAdminPassword && safeEqual(input, defaultAdminPassword))
+  );
 }
 
 function sanitizeText(value, fallback) {

@@ -7,7 +7,8 @@ const DATA_KEYS = {
 
 const ADMIN_COOKIE = "sff_admin";
 const DRIVE_STATE_COOKIE = "sff_google_drive_state";
-const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
+const DEFAULT_ADMIN_PASSWORD = "admin123";
 const DEFAULT_ACTIVITY = {
   id: "general",
   name: "รวมกิจกรรม",
@@ -125,9 +126,9 @@ async function handleApi(request, env, url) {
     const body = isFormLogin
       ? Object.fromEntries(await request.formData())
       : await request.json().catch(() => ({}));
-    const password = env.ADMIN_PASSWORD || "admin123";
+    const password = env.ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD;
 
-    if (String(body.password || "") !== password) {
+    if (!isValidAdminPassword(String(body.password || ""), password)) {
       if (isFormLogin) {
         return Response.redirect(`${url.origin}/admin.html?login=failed`, 302);
       }
@@ -927,9 +928,14 @@ async function getGoogleDriveConfig(env) {
       runtimeConfig.folderUrl ||
       ""
   );
+  const refreshTokenFromRuntime = Boolean(runtimeConfig.refreshToken || runtimeConfig.refresh_token);
+  const tokenScope = runtimeConfig.scope || runtimeConfig.driveScope || "";
+  const oauthNeedsReconnect = Boolean(
+    refreshToken && refreshTokenFromRuntime && tokenScope !== DRIVE_SCOPE
+  );
   const enabled = boolFrom(
     env.GOOGLE_DRIVE_ENABLED ?? runtimeConfig.enabled,
-    Boolean(folderId && clientId && clientSecret && refreshToken)
+    Boolean(folderId && clientId && clientSecret && refreshToken && !oauthNeedsReconnect)
   );
 
   return {
@@ -940,9 +946,10 @@ async function getGoogleDriveConfig(env) {
     folderId,
     folderUrl: folderId ? `https://drive.google.com/drive/folders/${folderId}` : "",
     oauthConfigured: Boolean(clientId && clientSecret),
-    connected: Boolean(refreshToken),
-    authMode: refreshToken ? "oauth" : clientId && clientSecret ? "oauth_pending" : "none",
-    configured: Boolean(folderId && clientId && clientSecret && refreshToken),
+    connected: Boolean(refreshToken && !oauthNeedsReconnect),
+    authMode: refreshToken ? (oauthNeedsReconnect ? "oauth_needs_reconnect" : "oauth") : clientId && clientSecret ? "oauth_pending" : "none",
+    configured: Boolean(folderId && clientId && clientSecret && refreshToken && !oauthNeedsReconnect),
+    scope: DRIVE_SCOPE,
     usingEnv: Boolean(
       env.GOOGLE_DRIVE_CLIENT_ID ||
         env.GOOGLE_CLIENT_ID ||
@@ -1155,6 +1162,7 @@ async function handleGoogleDriveOAuthCallback(request, env, url) {
 
   const runtimeConfig = await readJson(env, DATA_KEYS.driveConfig, {});
   runtimeConfig.refreshToken = refreshToken;
+  runtimeConfig.scope = DRIVE_SCOPE;
   await writeJson(env, DATA_KEYS.driveConfig, runtimeConfig);
 
   return redirectWithCookie(`${url.origin}/admin.html?drive=connected`, clearState);

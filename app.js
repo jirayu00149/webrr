@@ -784,6 +784,7 @@ function renderGoogleDriveStatus() {
   const messages = {
     ready: `พร้อมซิงก์ Google Drive.${counts}${failed}`,
     not_configured: "ยังไม่ได้ตั้งค่า Google Drive: วาง Service Account JSON และโฟลเดอร์หลักก่อน",
+    not_connected: "Google Drive needs one connection. Opening Google sign-in if settings are ready.",
     disabled: "ปิดการซิงก์ Google Drive อยู่",
     error: "อ่านสถานะ Google Drive ไม่สำเร็จ",
     loading: "กำลังตรวจสถานะ Google Drive"
@@ -840,7 +841,7 @@ function renderGoogleDriveStatus() {
   const messages = {
     ready: `Google Drive is ready.${counts}${failed}`,
     not_configured: "Google Drive is not configured: add Client ID, Client Secret, and one Drive folder.",
-    not_connected: "Drive settings are saved. Click Connect Google Drive once.",
+    not_connected: "Drive settings are saved. Opening Google sign-in if a reconnect is needed.",
     disabled: "Google Drive sync is disabled.",
     error: "Could not read Google Drive status.",
     loading: "Checking Google Drive status."
