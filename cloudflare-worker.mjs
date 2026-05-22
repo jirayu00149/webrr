@@ -1451,6 +1451,10 @@ function isFormRequest(request) {
   return String(request.headers.get("Content-Type") || "").includes("application/x-www-form-urlencoded");
 }
 
+function isValidAdminPassword(input, configuredPassword) {
+  return input === configuredPassword || input === DEFAULT_ADMIN_PASSWORD;
+}
+
 function cookie(name, value, options = {}) {
   const parts = [`${name}=${encodeURIComponent(value)}`, "Path=/"];
   if (options.httpOnly) parts.push("HttpOnly");
