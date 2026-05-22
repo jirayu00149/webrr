@@ -7,7 +7,7 @@ const crypto = require("crypto");
 
 const root = __dirname;
 const port = Number(process.env.PORT || 8080);
-const defaultAdminPassword = "adminbss";
+const defaultAdminPassword = "admin123";
 const adminPassword = process.env.ADMIN_PASSWORD || defaultAdminPassword;
 const dataDir = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
