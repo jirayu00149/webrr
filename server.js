@@ -7,7 +7,7 @@ const crypto = require("crypto");
 
 const root = __dirname;
 const port = Number(process.env.PORT || 8080);
-const defaultAdminPassword = "admin123";
+const defaultAdminPassword = "adminbss";
 const adminPassword = process.env.ADMIN_PASSWORD || defaultAdminPassword;
 const dataDir = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
@@ -95,7 +95,7 @@ if (require.main === module) {
     console.log(`School Face Finder is running at http://localhost:${port}`);
     console.log(`Public URL: http://localhost:${port}/user.html`);
     console.log(`Admin URL: http://localhost:${port}/admin.html`);
-    console.log("Default admin password is admin123. Set ADMIN_PASSWORD before production use.");
+    console.log("Default admin password is adminbss. Set ADMIN_PASSWORD before production use.");
   });
 }
 

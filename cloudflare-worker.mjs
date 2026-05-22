@@ -8,7 +8,7 @@ const DATA_KEYS = {
 const ADMIN_COOKIE = "sff_admin";
 const DRIVE_STATE_COOKIE = "sff_google_drive_state";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
-const DEFAULT_ADMIN_PASSWORD = "admin123";
+const DEFAULT_ADMIN_PASSWORD = "adminbss";
 const DEFAULT_ACTIVITY = {
   id: "general",
   name: "รวมกิจกรรม",
