@@ -68,8 +68,11 @@ async function handleApi(request, env, url) {
   }
 
   if (url.pathname === "/api/activities" && request.method === "GET") {
+    await syncGoogleDriveActivityFolders(env);
+    await ensureDefaultActivityDriveFolder(env);
     const photos = await readPhotos(env);
-    const activities = await readActivities(env);
+    const driveConfig = await getGoogleDriveConfig(env);
+    const activities = addConfiguredDefaultDriveLink(await readActivities(env), driveConfig);
     const shareState = await readShareState(env);
     const defaultActivity = activities.find((activity) => isDefaultActivityId(activity.id));
     return json({
@@ -93,8 +96,11 @@ async function handleApi(request, env, url) {
       return json({ error: "Invalid descriptor" }, 400);
     }
 
+    await syncGoogleDriveActivityFolders(env);
+    await ensureDefaultActivityDriveFolder(env);
     const photos = await readPhotos(env);
-    const activities = await readActivities(env);
+    const driveConfig = await getGoogleDriveConfig(env);
+    const activities = addConfiguredDefaultDriveLink(await readActivities(env), driveConfig);
     const searchablePhotos = activityId
       ? photos.filter((photo) => photoBelongsToActivity(photo, activityId))
       : photos;
@@ -710,12 +716,19 @@ async function createGoogleDriveFolderForActivity(env, activity, activities) {
       const folderExists = await googleDriveFolderExists(accessToken, activity.googleDriveFolderId);
       if (folderExists) {
         await ensureGoogleDriveFolderPublic(accessToken, activity.googleDriveFolderId);
+        const folderUrl =
+          activity.googleDriveFolderUrl ||
+          `https://drive.google.com/drive/folders/${activity.googleDriveFolderId}`;
+        if (!activity.googleDriveFolderUrl || activity.googleDriveFolderError) {
+          activity.googleDriveFolderUrl = folderUrl;
+          delete activity.googleDriveFolderError;
+          await writeJson(env, DATA_KEYS.activities, activities);
+          await updateShareGalleryFromDrive(env, folderUrl);
+        }
         return {
           status: "saved",
           folderId: activity.googleDriveFolderId,
-          folderUrl:
-            activity.googleDriveFolderUrl ||
-            `https://drive.google.com/drive/folders/${activity.googleDriveFolderId}`
+          folderUrl
         };
       }
 
@@ -1569,6 +1582,24 @@ function addActivityCounts(activities, photos) {
       ...activity,
       photosCount: activityPhotos.length,
       facesCount: activityPhotos.reduce((total, photo) => total + (photo.faces || []).length, 0)
+    };
+  });
+}
+
+function addConfiguredDefaultDriveLink(activities, config = {}) {
+  if (!config.folderId || !config.folderUrl) {
+    return activities;
+  }
+
+  return activities.map((activity) => {
+    if (!isDefaultActivityId(activity.id) || activity.googleDriveFolderUrl) {
+      return activity;
+    }
+
+    return {
+      ...activity,
+      googleDriveFolderId: activity.googleDriveFolderId || config.folderId,
+      googleDriveFolderUrl: config.folderUrl
     };
   });
 }

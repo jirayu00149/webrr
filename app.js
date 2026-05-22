@@ -126,6 +126,14 @@ let boothSeenImportFiles = new Set();
 let boothPendingAutoFiles = [];
 let boothAutoImportBusy = false;
 let boothGifWorkerUrl = "";
+let boothDragState = null;
+let boothDragBoxes = [];
+let boothTextPositions = {
+  title: null,
+  date: null,
+  subtitle: null,
+  footer: null
+};
 
 document.addEventListener("DOMContentLoaded", init);
 
@@ -172,7 +180,7 @@ async function init() {
 }
 
 function bindEvents() {
-  els.loginForm?.addEventListener("submit", handleLogin);
+  els.loginForm?.addEventListener("submit", () => setLoginLoading(true));
   window.addEventListener("hashchange", updateAdminView);
   els.logoutBtn?.addEventListener("click", handleLogout);
   els.activityForm?.addEventListener("submit", handleCreateActivity);
@@ -224,6 +232,11 @@ function bindEvents() {
     els.boothAccentColorInput,
     els.boothLogoSizeInput
   ].forEach((input) => input?.addEventListener("input", renderBoothStrip));
+
+  els.boothStripCanvas?.addEventListener("pointerdown", startBoothCanvasDrag);
+  window.addEventListener("pointermove", moveBoothCanvasDrag);
+  window.addEventListener("pointerup", stopBoothCanvasDrag);
+  window.addEventListener("pointercancel", stopBoothCanvasDrag);
 
   els.activitySelect?.addEventListener("change", () => {
     updateDeleteActivityButton();
@@ -649,6 +662,7 @@ function renderGoogleDriveConfig(config) {
   }
 
   renderGoogleDriveSetupHint(config);
+  maybeAutoConnectGoogleDrive(config);
 }
 
 function renderGoogleDriveSetupHint(config = {}) {
@@ -674,6 +688,27 @@ function renderGoogleDriveSetupHint(config = {}) {
   }
 
   els.googleDriveSetupHint.textContent = "Google Drive is connected.";
+}
+
+function maybeAutoConnectGoogleDrive(config = {}) {
+  if (page !== "admin" || !els.connectGoogleDriveBtn) {
+    return;
+  }
+
+  const canConnect =
+    config.clientId &&
+    config.hasClientSecret &&
+    config.folderId &&
+    !config.connected;
+
+  if (!canConnect || sessionStorage.getItem("photobss-drive-auto-connect-tried") === "1") {
+    return;
+  }
+
+  sessionStorage.setItem("photobss-drive-auto-connect-tried", "1");
+  window.setTimeout(() => {
+    window.location.href = "/api/admin/google-drive/connect";
+  }, 300);
 }
 
 async function saveGoogleDriveConfig() {
@@ -1401,9 +1436,10 @@ function renderBoothStrip() {
   const accentColor = els.boothAccentColorInput?.value || "#ec4899";
   const title = els.boothTitleInput?.value.trim() || "BSS PHOTO BOOTH";
   const subtitle = els.boothSubtitleInput?.value.trim() || "School memories";
-  const photoFit = els.boothFitSelect?.value || "cover";
+  const photoFit = els.boothFitSelect?.value || "contain";
   const photoScale = Number(els.boothPhotoScaleInput?.value || 100) / 100;
 
+  boothDragBoxes = [];
   ctx.clearRect(0, 0, width, height);
   fillBoothBackground(ctx, width, height);
 
@@ -1428,9 +1464,14 @@ function renderBoothStrip() {
   ctx.fillStyle = textColor;
   ctx.textAlign = "center";
   ctx.font = `700 ${layout.titleSize}px Georgia, serif`;
-  wrapCanvasText(ctx, title.toUpperCase(), width / 2, layout.titleY, width - layout.margin * 2, layout.titleSize + 10);
+  const titlePoint = getBoothTextPoint("title", width / 2, layout.titleY, width, height);
+  wrapCanvasText(ctx, title.toUpperCase(), titlePoint.x, titlePoint.y, width - layout.margin * 2, layout.titleSize + 10);
+  registerBoothTextBox(ctx, "title", title.toUpperCase(), titlePoint.x, titlePoint.y, layout.titleSize * 1.8, width);
   ctx.font = `800 ${layout.dateSize}px Segoe UI, sans-serif`;
-  ctx.fillText(new Date().toLocaleDateString("th-TH"), width / 2, layout.dateY);
+  const dateText = new Date().toLocaleDateString("th-TH");
+  const datePoint = getBoothTextPoint("date", width / 2, layout.dateY, width, height);
+  ctx.fillText(dateText, datePoint.x, datePoint.y);
+  registerBoothTextBox(ctx, "date", dateText, datePoint.x, datePoint.y, layout.dateSize * 1.9, width);
 
   for (let index = 0; index < BOOTH_REQUIRED_SHOTS; index += 1) {
     const slot = layout.slots[index];
@@ -1453,10 +1494,125 @@ function renderBoothStrip() {
 
   ctx.fillStyle = textColor;
   ctx.font = `700 ${layout.subtitleSize}px Georgia, serif`;
-  ctx.fillText(subtitle, width / 2, height - layout.subtitleBottom);
+  const subtitlePoint = getBoothTextPoint(
+    "subtitle",
+    width / 2,
+    height - layout.subtitleBottom,
+    width,
+    height
+  );
+  ctx.fillText(subtitle, subtitlePoint.x, subtitlePoint.y);
+  registerBoothTextBox(ctx, "subtitle", subtitle, subtitlePoint.x, subtitlePoint.y, layout.subtitleSize * 1.9, width);
   ctx.font = `700 ${layout.footerSize}px Segoe UI, sans-serif`;
-  ctx.fillText("photobss.onrender.com", width / 2, height - layout.footerBottom);
+  const footerText = "photobss.onrender.com";
+  const footerPoint = getBoothTextPoint(
+    "footer",
+    width / 2,
+    height - layout.footerBottom,
+    width,
+    height
+  );
+  ctx.fillText(footerText, footerPoint.x, footerPoint.y);
+  registerBoothTextBox(ctx, "footer", footerText, footerPoint.x, footerPoint.y, layout.footerSize * 2.1, width);
   updateBoothButtons();
+}
+
+function getBoothTextPoint(id, defaultX, defaultY, width, height) {
+  const position = boothTextPositions[id];
+  if (!position) {
+    return { x: defaultX, y: defaultY };
+  }
+
+  return {
+    x: clamp(position.x * width, width * 0.04, width * 0.96),
+    y: clamp(position.y * height, height * 0.03, height * 0.97)
+  };
+}
+
+function setBoothTextPoint(id, x, y, width, height) {
+  boothTextPositions[id] = {
+    x: clamp(x / width, 0.04, 0.96),
+    y: clamp(y / height, 0.03, 0.97)
+  };
+}
+
+function registerBoothTextBox(ctx, id, text, x, y, height, canvasWidth) {
+  const measuredWidth = Math.max(ctx.measureText(text || id).width + 80, canvasWidth * 0.26);
+  boothDragBoxes.push({
+    id,
+    x: x - measuredWidth / 2,
+    y: y - height * 0.82,
+    w: measuredWidth,
+    h: height
+  });
+}
+
+function startBoothCanvasDrag(event) {
+  if (page !== "admin" || !els.boothStripCanvas) {
+    return;
+  }
+
+  const point = getBoothCanvasPoint(event);
+  const hit = [...boothDragBoxes]
+    .reverse()
+    .find(
+      (box) =>
+        point.x >= box.x &&
+        point.x <= box.x + box.w &&
+        point.y >= box.y &&
+        point.y <= box.y + box.h
+    );
+
+  if (!hit) {
+    return;
+  }
+
+  event.preventDefault();
+  boothDragState = { id: hit.id, pointerId: event.pointerId };
+  els.boothStripCanvas.setPointerCapture?.(event.pointerId);
+  els.boothStripCanvas.classList.add("is-dragging");
+}
+
+function moveBoothCanvasDrag(event) {
+  if (!boothDragState || !els.boothStripCanvas) {
+    return;
+  }
+
+  event.preventDefault();
+  const point = getBoothCanvasPoint(event);
+  setBoothTextPoint(
+    boothDragState.id,
+    point.x,
+    point.y,
+    els.boothStripCanvas.width,
+    els.boothStripCanvas.height
+  );
+  renderBoothStrip();
+}
+
+function stopBoothCanvasDrag(event) {
+  if (!boothDragState || !els.boothStripCanvas) {
+    return;
+  }
+
+  els.boothStripCanvas.releasePointerCapture?.(boothDragState.pointerId || event.pointerId);
+  els.boothStripCanvas.classList.remove("is-dragging");
+  boothDragState = null;
+}
+
+function getBoothCanvasPoint(event) {
+  const canvas = els.boothStripCanvas;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / Math.max(rect.width, 1);
+  const scaleY = canvas.height / Math.max(rect.height, 1);
+  return {
+    x: (event.clientX - rect.left) * scaleX,
+    y: (event.clientY - rect.top) * scaleY
+  };
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
 }
 
 function getBoothLayoutSpec() {
