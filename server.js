@@ -203,7 +203,7 @@ async function handleApi(request, response, url) {
       return;
     }
 
-    const token = crypto.randomBytes(32).toString("hex");
+    const token = createAdminSessionToken();
     sessions.add(token);
     const cookieHeader = cookie("sff_admin", token, { httpOnly: true, sameSite: "Lax" });
     if (isFormLogin) {
@@ -2821,7 +2821,7 @@ function redirect(response, location) {
 
 function isAuthenticated(request) {
   const token = getCookie(request, "sff_admin");
-  return Boolean(token && sessions.has(token));
+  return Boolean(token && (sessions.has(token) || verifyAdminSessionToken(token)));
 }
 
 function getCookie(request, name) {
@@ -2854,6 +2854,34 @@ function isValidAdminPassword(input) {
     safeEqual(input, adminPassword) ||
     (adminPassword !== defaultAdminPassword && safeEqual(input, defaultAdminPassword))
   );
+}
+
+function createAdminSessionToken() {
+  const expiresAt = Date.now() + 1000 * 60 * 60 * 24 * 7;
+  const nonce = crypto.randomBytes(16).toString("hex");
+  const payload = `${expiresAt}.${nonce}`;
+  return `${payload}.${signAdminSessionPayload(payload)}`;
+}
+
+function verifyAdminSessionToken(token) {
+  const parts = String(token || "").split(".");
+  if (parts.length !== 3) {
+    return false;
+  }
+
+  const [expiresAt, nonce, signature] = parts;
+  if (!Number.isFinite(Number(expiresAt)) || Number(expiresAt) < Date.now() || !nonce || !signature) {
+    return false;
+  }
+
+  return safeEqual(signature, signAdminSessionPayload(`${expiresAt}.${nonce}`));
+}
+
+function signAdminSessionPayload(payload) {
+  return crypto
+    .createHmac("sha256", process.env.ADMIN_SESSION_SECRET || defaultAdminPassword)
+    .update(payload)
+    .digest("hex");
 }
 
 function sanitizeText(value, fallback) {
