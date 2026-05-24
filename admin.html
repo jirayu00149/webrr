@@ -187,78 +187,88 @@
               </button>
             </div>
             <p class="small-note" id="boothStatus">ถ่ายหรือใส่รูปให้ครบ 3 รูป แล้วระบบจะจัดโพลารอยให้อัตโนมัติ</p>
-            <p class="small-note">ลากหัวข้อ วันที่ ข้อความล่าง หรือ URL บนภาพตัวอย่างเพื่อจัดตำแหน่งเองได้</p>
+            <p class="small-note">ลากหัวข้อหรือวันที่บนภาพตัวอย่างเพื่อจัดตำแหน่งเองได้</p>
           </div>
 
           <div class="booth-style-panel">
-            <label>
-              เลย์เอาท์
-              <select id="boothLayoutSelect" class="select-input">
-                <option value="strip">Classic Strip 3 รูป</option>
-                <option value="poster">Poster 1+2 รูป</option>
-                <option value="wide">Wide Card 3 รูป</option>
-              </select>
-            </label>
-            <div class="booth-color-grid">
+            <div class="booth-control-group">
+              <p class="booth-group-title">เลย์เอาท์</p>
               <label>
-                Fit รูป
-                <select id="boothFitSelect" class="select-input">
-                  <option value="contain" selected>เห็นทั้งรูป</option>
-                  <option value="cover">เต็มช่อง</option>
+                รูปแบบ
+                <select id="boothLayoutSelect" class="select-input">
+                  <option value="strip">Classic Strip 3 รูป</option>
+                  <option value="poster">Poster 1+2 รูป</option>
+                  <option value="wide">Wide Card 3 รูป</option>
                 </select>
               </label>
+              <div class="booth-color-grid">
+                <label>
+                  Fit รูป
+                  <select id="boothFitSelect" class="select-input">
+                    <option value="contain" selected>เห็นทั้งรูป</option>
+                    <option value="cover">เต็มช่อง</option>
+                  </select>
+                </label>
+                <label>
+                  ขนาดรูป
+                  <input id="boothPhotoScaleInput" type="range" min="90" max="130" value="100" />
+                </label>
+              </div>
               <label>
-                ขนาดรูป
-                <input id="boothPhotoScaleInput" type="range" min="90" max="130" value="100" />
+                หัวข้อบนเฟรม
+                <input id="boothTitleInput" type="text" value="BSS PHOTO BOOTH" />
               </label>
             </div>
-            <label>
-              หัวข้อบนเฟรม
-              <input id="boothTitleInput" type="text" value="BSS PHOTO BOOTH" />
-            </label>
-            <label>
-              ข้อความล่างเฟรม
-              <input id="boothSubtitleInput" type="text" value="School memories" />
-            </label>
-            <div class="booth-color-grid">
+
+            <div class="booth-control-group">
+              <p class="booth-group-title">ไฟล์ตกแต่ง</p>
               <label>
-                พื้นหลัง 1
-                <input id="boothBgColorInput" type="color" value="#111827" />
+                ไฟล์อินโฟด้านล่าง
+                <input id="boothInfoInput" type="file" accept="image/*" />
               </label>
               <label>
-                พื้นหลัง 2
-                <input id="boothBgColor2Input" type="color" value="#312e81" />
+                ไฟล์ลายน้ำมุมขวาบน
+                <input id="boothLogoInput" type="file" accept="image/*" />
               </label>
               <label>
-                พื้นหลัง 3
-                <input id="boothBgColor3Input" type="color" value="#0f766e" />
+                ขนาดลายน้ำ
+                <input id="boothLogoSizeInput" type="range" min="60" max="240" value="128" />
               </label>
               <label>
-                กรอบรูป
-                <input id="boothFrameColorInput" type="color" value="#ffffff" />
-              </label>
-              <label>
-                สีตัวอักษร
-                <input id="boothTextColorInput" type="color" value="#ffffff" />
-              </label>
-              <label>
-                เส้นตกแต่ง
-                <input id="boothAccentColorInput" type="color" value="#ec4899" />
+                ภาพพื้นหลัง/ลายเฟรม
+                <input id="boothOverlayInput" type="file" accept="image/*" />
               </label>
             </div>
-            <label>
-              ไฟล์ลายน้ำมุมขวาบน
-              <input id="boothLogoInput" type="file" accept="image/*" />
-            </label>
-            <label>
-              ขนาดลายน้ำ
-              <input id="boothLogoSizeInput" type="range" min="60" max="240" value="128" />
-            </label>
-            <label>
-              ภาพพื้นหลัง/ลายเฟรม
-              <input id="boothOverlayInput" type="file" accept="image/*" />
-            </label>
-            <p class="small-note">ลากหัวข้อ วันที่ และข้อความล่างบนภาพตัวอย่างเพื่อจัดตำแหน่งเองได้ ลายน้ำรูปภาพจะถูกวางที่มุมขวาบนของรูปทุกใบก่อนบันทึกลง Drive</p>
+
+            <details class="booth-advanced">
+              <summary>สีและเส้นเฟรม</summary>
+              <div class="booth-color-grid">
+                <label>
+                  พื้นหลัง 1
+                  <input id="boothBgColorInput" type="color" value="#111827" />
+                </label>
+                <label>
+                  พื้นหลัง 2
+                  <input id="boothBgColor2Input" type="color" value="#312e81" />
+                </label>
+                <label>
+                  พื้นหลัง 3
+                  <input id="boothBgColor3Input" type="color" value="#0f766e" />
+                </label>
+                <label>
+                  กรอบรูป
+                  <input id="boothFrameColorInput" type="color" value="#ffffff" />
+                </label>
+                <label>
+                  สีตัวอักษร
+                  <input id="boothTextColorInput" type="color" value="#ffffff" />
+                </label>
+                <label>
+                  เส้นตกแต่ง
+                  <input id="boothAccentColorInput" type="color" value="#ec4899" />
+                </label>
+              </div>
+            </details>
           </div>
         </div>
       </section>

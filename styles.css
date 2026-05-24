@@ -1312,9 +1312,15 @@ body.viewer-open {
 
 .photobooth-layout {
   display: grid;
-  grid-template-columns: minmax(260px, 0.95fr) minmax(280px, 0.72fr) minmax(250px, 0.72fr);
-  gap: 18px;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(260px, 0.62fr) minmax(250px, 0.68fr);
+  gap: 16px;
   align-items: start;
+}
+
+.booth-capture,
+.booth-preview-card,
+.booth-style-panel {
+  min-width: 0;
 }
 
 .booth-video-wrap {
@@ -1347,8 +1353,8 @@ body.viewer-open {
 .booth-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .booth-camera-controls .select-input {
@@ -1358,12 +1364,12 @@ body.viewer-open {
 
 .booth-auto-import {
   display: grid;
-  gap: 10px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 10px;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface-tint);
-  padding: 12px;
+  border-radius: 8px;
+  background: #f8fbff;
+  padding: 10px;
 }
 
 .booth-auto-check {
@@ -1388,8 +1394,8 @@ body.viewer-open {
 .booth-shot-list {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .booth-shot-list figure {
@@ -1431,8 +1437,8 @@ body.viewer-open {
 .booth-preview-card canvas {
   display: block;
   width: auto;
-  max-width: min(100%, 380px);
-  max-height: min(72vh, 760px);
+  max-width: min(100%, 330px);
+  max-height: min(68vh, 720px);
   height: auto;
   margin: 0 auto;
   border-radius: 4px;
@@ -1449,12 +1455,12 @@ body.viewer-open {
 
 .booth-style-panel {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .booth-style-panel label {
   display: grid;
-  gap: 7px;
+  gap: 6px;
   color: var(--muted);
   font-weight: 800;
 }
@@ -1474,6 +1480,12 @@ body.viewer-open {
   font-weight: 700;
 }
 
+.booth-style-panel input[type="file"] {
+  min-height: 40px;
+  padding: 7px 9px;
+  background: #fbfdff;
+}
+
 .booth-style-panel input[type="range"] {
   padding: 0;
   accent-color: var(--primary);
@@ -1482,7 +1494,7 @@ body.viewer-open {
 .booth-color-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .booth-color-grid input {
@@ -1492,6 +1504,47 @@ body.viewer-open {
   border-radius: var(--radius);
   background: #fff;
   padding: 4px;
+}
+
+.booth-control-group {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.booth-control-group:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.booth-group-title {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.booth-advanced {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.booth-advanced summary {
+  cursor: pointer;
+  color: var(--ink);
+  font-weight: 950;
+  list-style-position: outside;
+}
+
+.booth-advanced .booth-color-grid {
+  margin-top: 10px;
+}
+
+.booth-actions .small-button {
+  flex: 1 1 96px;
 }
 
 .gallery-link-panel {

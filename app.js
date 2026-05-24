@@ -91,13 +91,13 @@ const els = {
   boothFitSelect: $("#boothFitSelect"),
   boothPhotoScaleInput: $("#boothPhotoScaleInput"),
   boothTitleInput: $("#boothTitleInput"),
-  boothSubtitleInput: $("#boothSubtitleInput"),
   boothBgColorInput: $("#boothBgColorInput"),
   boothBgColor2Input: $("#boothBgColor2Input"),
   boothBgColor3Input: $("#boothBgColor3Input"),
   boothFrameColorInput: $("#boothFrameColorInput"),
   boothTextColorInput: $("#boothTextColorInput"),
   boothAccentColorInput: $("#boothAccentColorInput"),
+  boothInfoInput: $("#boothInfoInput"),
   boothLogoInput: $("#boothLogoInput"),
   boothLogoSizeInput: $("#boothLogoSizeInput"),
   boothOverlayInput: $("#boothOverlayInput")
@@ -118,6 +118,7 @@ let boothShots = [];
 let boothStream = null;
 let boothLogoImage = null;
 let boothOverlayImage = null;
+let boothInfoImage = null;
 let boothLastGifBlob = null;
 let boothSetId = Date.now().toString(36);
 let boothWatchHandle = null;
@@ -130,9 +131,7 @@ let boothDragState = null;
 let boothDragBoxes = [];
 let boothTextPositions = {
   title: null,
-  date: null,
-  subtitle: null,
-  footer: null
+  date: null
 };
 
 document.addEventListener("DOMContentLoaded", init);
@@ -217,13 +216,13 @@ function bindEvents() {
     importBoothShots(event.dataTransfer?.files);
   });
   els.boothLogoInput?.addEventListener("change", (event) => loadBoothAsset(event.target.files?.[0], "logo"));
+  els.boothInfoInput?.addEventListener("change", (event) => loadBoothAsset(event.target.files?.[0], "info"));
   els.boothOverlayInput?.addEventListener("change", (event) => loadBoothAsset(event.target.files?.[0], "overlay"));
   [
     els.boothLayoutSelect,
     els.boothFitSelect,
     els.boothPhotoScaleInput,
     els.boothTitleInput,
-    els.boothSubtitleInput,
     els.boothBgColorInput,
     els.boothBgColor2Input,
     els.boothBgColor3Input,
@@ -1436,7 +1435,6 @@ function renderBoothStrip() {
   const textColor = els.boothTextColorInput?.value || "#ffffff";
   const accentColor = els.boothAccentColorInput?.value || "#ec4899";
   const title = els.boothTitleInput?.value.trim() || "BSS PHOTO BOOTH";
-  const subtitle = els.boothSubtitleInput?.value.trim() || "School memories";
   const photoFit = els.boothFitSelect?.value || "contain";
   const photoScale = Number(els.boothPhotoScaleInput?.value || 100) / 100;
 
@@ -1493,28 +1491,7 @@ function renderBoothStrip() {
     }
   }
 
-  ctx.fillStyle = textColor;
-  ctx.font = `700 ${layout.subtitleSize}px Georgia, serif`;
-  const subtitlePoint = getBoothTextPoint(
-    "subtitle",
-    width / 2,
-    height - layout.subtitleBottom,
-    width,
-    height
-  );
-  ctx.fillText(subtitle, subtitlePoint.x, subtitlePoint.y);
-  registerBoothTextBox(ctx, "subtitle", subtitle, subtitlePoint.x, subtitlePoint.y, layout.subtitleSize * 1.9, width);
-  ctx.font = `700 ${layout.footerSize}px Segoe UI, sans-serif`;
-  const footerText = "photobss.onrender.com";
-  const footerPoint = getBoothTextPoint(
-    "footer",
-    width / 2,
-    height - layout.footerBottom,
-    width,
-    height
-  );
-  ctx.fillText(footerText, footerPoint.x, footerPoint.y);
-  registerBoothTextBox(ctx, "footer", footerText, footerPoint.x, footerPoint.y, layout.footerSize * 2.1, width);
+  drawBoothInfoImage(ctx, layout, width, height);
   updateBoothButtons();
 }
 
@@ -1631,10 +1608,8 @@ function getBoothLayoutSpec() {
       titleSize: 58,
       dateSize: 26,
       placeholderSize: 30,
-      subtitleSize: 44,
-      footerSize: 22,
-      subtitleBottom: 132,
-      footerBottom: 82,
+      infoBottom: 88,
+      infoMaxHeight: 360,
       slots: [
         { x: 70, y: 330, w: 760, h: 510 },
         { x: 70, y: 930, w: 760, h: 510 },
@@ -1653,10 +1628,8 @@ function getBoothLayoutSpec() {
       titleSize: 58,
       dateSize: 25,
       placeholderSize: 26,
-      subtitleSize: 38,
-      footerSize: 20,
-      subtitleBottom: 100,
-      footerBottom: 56,
+      infoBottom: 56,
+      infoMaxHeight: 170,
       slots: [
         { x: 95, y: 270, w: 1010, h: 620 },
         { x: 95, y: 980, w: 485, h: 500 },
@@ -1675,10 +1648,8 @@ function getBoothLayoutSpec() {
       titleSize: 56,
       dateSize: 24,
       placeholderSize: 25,
-      subtitleSize: 34,
-      footerSize: 18,
-      subtitleBottom: 82,
-      footerBottom: 44,
+      infoBottom: 38,
+      infoMaxHeight: 110,
       slots: [
         { x: 80, y: 280, w: 450, h: 585 },
         { x: 575, y: 280, w: 450, h: 585 },
@@ -1713,6 +1684,31 @@ function fillBoothBackground(ctx, width, height) {
     ctx.fillStyle = gradient;
   }
   ctx.fillRect(0, 0, width, height);
+}
+
+function drawBoothInfoImage(ctx, layout, width, height) {
+  if (!boothInfoImage) {
+    return;
+  }
+
+  const margin = Math.max(layout.margin || 40, Math.round(width * 0.06));
+  const maxWidth = width - margin * 2;
+  const maxHeight = Math.min(layout.infoMaxHeight || height * 0.16, height * 0.22);
+  const ratio = boothInfoImage.naturalWidth / boothInfoImage.naturalHeight || 1;
+  let targetWidth = maxWidth;
+  let targetHeight = targetWidth / ratio;
+
+  if (targetHeight > maxHeight) {
+    targetHeight = maxHeight;
+    targetWidth = targetHeight * ratio;
+  }
+
+  const x = (width - targetWidth) / 2;
+  const y = height - (layout.infoBottom || 60) - targetHeight;
+  ctx.save();
+  ctx.globalAlpha = 0.98;
+  drawImageContain(ctx, boothInfoImage, x, y, targetWidth, targetHeight);
+  ctx.restore();
 }
 
 function drawBoothImageWatermark(ctx, slot) {
@@ -1754,6 +1750,8 @@ async function loadBoothAsset(file, type) {
   const image = await loadImageFromDataUrl(dataUrl);
   if (type === "logo") {
     boothLogoImage = image;
+  } else if (type === "info") {
+    boothInfoImage = image;
   } else {
     boothOverlayImage = image;
   }
@@ -1965,7 +1963,6 @@ function makeBoothSinglePhotoGifFrame(shot) {
   canvas.height = BOOTH_GIF_HEIGHT;
   const ctx = canvas.getContext("2d");
   const frameColor = els.boothFrameColorInput?.value || "#ffffff";
-  const textColor = els.boothTextColorInput?.value || "#ffffff";
   const accentColor = els.boothAccentColorInput?.value || "#ec4899";
   const photoFit = "contain";
   const photoScale = 1;
@@ -2003,11 +2000,16 @@ function makeBoothSinglePhotoGifFrame(shot) {
   ctx.fillRect(slot.x, slot.y, slot.w, slot.h);
   drawPhotoInSlot(ctx, shot.image, slot, photoFit, photoScale);
   drawBoothImageWatermark(ctx, slot);
-
-  ctx.fillStyle = textColor;
-  ctx.font = `800 ${Math.max(16, Math.round(canvas.width * 0.025))}px Segoe UI, sans-serif`;
-  ctx.textAlign = "center";
-  ctx.fillText("PHOTO BSS", canvas.width / 2, canvas.height - Math.round(canvas.height * 0.063));
+  drawBoothInfoImage(
+    ctx,
+    {
+      margin: Math.round(canvas.width * 0.08),
+      infoBottom: Math.round(canvas.height * 0.04),
+      infoMaxHeight: Math.round(canvas.height * 0.08)
+    },
+    canvas.width,
+    canvas.height
+  );
   return canvas;
 }
 
