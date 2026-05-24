@@ -8,7 +8,8 @@ const DATA_KEYS = {
 const ADMIN_COOKIE = "sff_admin";
 const DRIVE_STATE_COOKIE = "sff_google_drive_state";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
-const DEFAULT_ADMIN_PASSWORD = "adminbss";
+const PRIMARY_ADMIN_PASSWORD = "adminbss";
+const LEGACY_ADMIN_PASSWORD = "admin123";
 const DEFAULT_ACTIVITY = {
   id: "general",
   name: "รวมกิจกรรม",
@@ -126,9 +127,10 @@ async function handleApi(request, env, url) {
     const body = isFormLogin
       ? Object.fromEntries(await request.formData())
       : await request.json().catch(() => ({}));
-    const password = env.ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD;
+    const password = env.ADMIN_PASSWORD || PRIMARY_ADMIN_PASSWORD;
+    const submittedPasswords = getSubmittedAdminPasswords(body);
 
-    if (!isValidAdminPassword(String(body.password || "").trim(), password)) {
+    if (!submittedPasswords.some((input) => isValidAdminPassword(input, password))) {
       if (isFormLogin) {
         return Response.redirect(`${url.origin}/admin.html?login=failed`, 302);
       }
@@ -1452,7 +1454,15 @@ function isFormRequest(request) {
 }
 
 function isValidAdminPassword(input, configuredPassword) {
-  return input === configuredPassword || input === DEFAULT_ADMIN_PASSWORD;
+  return [configuredPassword, PRIMARY_ADMIN_PASSWORD, LEGACY_ADMIN_PASSWORD]
+    .filter(Boolean)
+    .includes(input);
+}
+
+function getSubmittedAdminPasswords(body = {}) {
+  return [body.password, body.fallbackPassword, body.adminPassword]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
 }
 
 function cookie(name, value, options = {}) {

@@ -7,8 +7,9 @@ const crypto = require("crypto");
 
 const root = __dirname;
 const port = Number(process.env.PORT || 8080);
-const defaultAdminPassword = "admin123";
-const adminPassword = process.env.ADMIN_PASSWORD || defaultAdminPassword;
+const primaryAdminPassword = "adminbss";
+const legacyAdminPassword = "admin123";
+const adminPassword = process.env.ADMIN_PASSWORD || primaryAdminPassword;
 const dataDir = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
   : path.join(root, "data");
@@ -194,7 +195,8 @@ async function handleApi(request, response, url) {
   if (url.pathname === "/api/admin/login" && request.method === "POST") {
     const isFormLogin = isFormRequest(request);
     const body = await readLoginBody(request, 32 * 1024);
-    if (!body || !isValidAdminPassword(String(body.password || "").trim())) {
+    const submittedPasswords = getSubmittedAdminPasswords(body);
+    if (!submittedPasswords.some(isValidAdminPassword)) {
       if (isFormLogin) {
         redirect(response, "/admin.html?login=failed");
         return;
@@ -2850,10 +2852,16 @@ function safeEqual(input, expected) {
 }
 
 function isValidAdminPassword(input) {
-  return (
-    safeEqual(input, adminPassword) ||
-    (adminPassword !== defaultAdminPassword && safeEqual(input, defaultAdminPassword))
-  );
+  const candidates = [adminPassword, primaryAdminPassword, legacyAdminPassword]
+    .filter(Boolean)
+    .filter((value, index, list) => list.indexOf(value) === index);
+  return candidates.some((candidate) => safeEqual(input, candidate));
+}
+
+function getSubmittedAdminPasswords(body = {}) {
+  return [body.password, body.fallbackPassword, body.adminPassword]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
 }
 
 function createAdminSessionToken() {
@@ -2879,7 +2887,7 @@ function verifyAdminSessionToken(token) {
 
 function signAdminSessionPayload(payload) {
   return crypto
-    .createHmac("sha256", process.env.ADMIN_SESSION_SECRET || defaultAdminPassword)
+    .createHmac("sha256", process.env.ADMIN_SESSION_SECRET || primaryAdminPassword)
     .update(payload)
     .digest("hex");
 }
