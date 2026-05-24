@@ -1962,54 +1962,8 @@ function makeBoothSinglePhotoGifFrame(shot) {
   canvas.width = BOOTH_GIF_WIDTH;
   canvas.height = BOOTH_GIF_HEIGHT;
   const ctx = canvas.getContext("2d");
-  const frameColor = els.boothFrameColorInput?.value || "#ffffff";
-  const accentColor = els.boothAccentColorInput?.value || "#ec4899";
-  const photoFit = "contain";
-  const photoScale = 1;
-  const slot = {
-    x: Math.round(canvas.width * 0.079),
-    y: Math.round(canvas.height * 0.119),
-    w: Math.round(canvas.width * 0.842),
-    h: Math.round(canvas.height * 0.737)
-  };
-  const framePad = Math.max(6, Math.round(canvas.width * 0.01));
-  const edge = Math.max(6, Math.round(canvas.height * 0.018));
-
-  fillBoothBackground(ctx, canvas.width, canvas.height);
-  if (boothOverlayImage) {
-    ctx.save();
-    ctx.globalAlpha = 0.18;
-    drawImageCover(ctx, boothOverlayImage, 0, 0, canvas.width, canvas.height);
-    ctx.restore();
-  }
-
-  ctx.fillStyle = accentColor;
-  ctx.fillRect(0, 0, canvas.width, edge);
-  ctx.fillRect(0, canvas.height - edge, canvas.width, edge);
-  ctx.fillStyle = frameColor;
-  roundRect(
-    ctx,
-    slot.x - framePad,
-    slot.y - framePad,
-    slot.w + framePad * 2,
-    slot.h + framePad * 2,
-    Math.max(8, framePad)
-  );
-  ctx.fill();
-  ctx.fillStyle = "#050816";
-  ctx.fillRect(slot.x, slot.y, slot.w, slot.h);
-  drawPhotoInSlot(ctx, shot.image, slot, photoFit, photoScale);
-  drawBoothImageWatermark(ctx, slot);
-  drawBoothInfoImage(
-    ctx,
-    {
-      margin: Math.round(canvas.width * 0.08),
-      infoBottom: Math.round(canvas.height * 0.04),
-      infoMaxHeight: Math.round(canvas.height * 0.08)
-    },
-    canvas.width,
-    canvas.height
-  );
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawImageCover(ctx, shot.image, 0, 0, canvas.width, canvas.height);
   return canvas;
 }
 
