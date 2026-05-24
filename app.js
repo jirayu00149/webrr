@@ -131,7 +131,8 @@ let boothDragState = null;
 let boothDragBoxes = [];
 let boothTextPositions = {
   title: null,
-  date: null
+  date: null,
+  info: null
 };
 
 document.addEventListener("DOMContentLoaded", init);
@@ -1525,6 +1526,16 @@ function registerBoothTextBox(ctx, id, text, x, y, height, canvasWidth) {
   });
 }
 
+function registerBoothImageBox(id, x, y, width, height) {
+  boothDragBoxes.push({
+    id,
+    x,
+    y,
+    w: width,
+    h: height
+  });
+}
+
 function startBoothCanvasDrag(event) {
   if (page !== "admin" || !els.boothStripCanvas) {
     return;
@@ -1703,12 +1714,16 @@ function drawBoothInfoImage(ctx, layout, width, height) {
     targetWidth = targetHeight * ratio;
   }
 
-  const x = (width - targetWidth) / 2;
-  const y = height - (layout.infoBottom || 60) - targetHeight;
+  const defaultX = width / 2;
+  const defaultY = height - (layout.infoBottom || 60) - targetHeight / 2;
+  const point = getBoothTextPoint("info", defaultX, defaultY, width, height);
+  const x = clamp(point.x - targetWidth / 2, 0, width - targetWidth);
+  const y = clamp(point.y - targetHeight / 2, 0, height - targetHeight);
   ctx.save();
   ctx.globalAlpha = 0.98;
   drawImageContain(ctx, boothInfoImage, x, y, targetWidth, targetHeight);
   ctx.restore();
+  registerBoothImageBox("info", x, y, targetWidth, targetHeight);
 }
 
 function drawBoothImageWatermark(ctx, slot) {
@@ -1752,6 +1767,7 @@ async function loadBoothAsset(file, type) {
     boothLogoImage = image;
   } else if (type === "info") {
     boothInfoImage = image;
+    boothTextPositions.info = null;
   } else {
     boothOverlayImage = image;
   }
